@@ -14,7 +14,7 @@ SaaS de programas de fidelización white-label para negocios locales chilenos.
 ## Stack
 - React 19 + Vite 8 + React Router DOM 7 + TanStack Query 5
 - Supabase (auth + DB + realtime) — `@supabase/supabase-js` v2
-- Tailwind CSS 4 (config en `tailwind.config.js`)
+- Tailwind CSS 4 — tokens en `src/index.css` vía `@theme {}` (NO en tailwind.config.js); postcss usa `@tailwindcss/postcss`
 - lucide-react (iconos), recharts (gráficos), qrcode.react (QR), react-hot-toast (toasts), date-fns (fechas)
 
 ## Colores de marca (definidos en src/index.css vía @theme — Tailwind v4)
@@ -34,6 +34,8 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 
 ## Convenciones
 - Componentes en `src/components/`, páginas en `src/pages/`
-- Rutas en `src/App.jsx` (React Router v7 con `createBrowserRouter`)
+- Rutas en `src/App.jsx` (React Router v7 con `<BrowserRouter>` + `<Routes>` component API)
 - Cliente Supabase instanciado en `src/lib/supabase.js`
 - Variables de entorno: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- Auth: no llamar `navigate()` tras `signIn()`/`signUp()` — PublicRoute/ProtectedRoute redirigen reactivamente al cambiar `user`
+- Nombre del negocio en sidebar: viene de `user.user_metadata.business_name` (guardado con `supabase.auth.updateUser` en onboarding)
