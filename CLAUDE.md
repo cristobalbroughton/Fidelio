@@ -24,8 +24,14 @@ SaaS de programas de fidelización white-label para negocios locales chilenos.
 
 ## Base de datos Supabase
 Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
-- Toda query a Supabase va en hooks de React Query (`useQuery` / `useMutation`)
+- Supabase: usar async/await directo (no React Query) — TanStack Query instalado pero aún no integrado
 - Row Level Security (RLS) habilitado — cada `business` solo ve sus propios datos
+
+## Schema Supabase
+- `businesses`: owner_id, name, slug, category, description, program_name, points_per_clp, welcome_points
+- `loyalty_customers`: business_id, phone, name, points_balance, visits_count, last_visit_at
+- `transactions`: business_id, customer_id, type (welcome|earn|redeem), points_delta, amount_clp, created_at
+- `rewards`: business_id, name, points_required, type (product|discount)
 
 ## Comandos útiles
 - `npm run dev` — servidor local Vite
@@ -39,3 +45,4 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - Variables de entorno: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 - Auth: no llamar `navigate()` tras `signIn()`/`signUp()` — PublicRoute/ProtectedRoute redirigen reactivamente al cambiar `user`
 - Nombre del negocio en sidebar: viene de `user.user_metadata.business_name` (guardado con `supabase.auth.updateUser` en onboarding)
+- PublicRoute redirige a `/onboarding` si `user_metadata.business_name` está vacío, a `/dashboard` si está presente
