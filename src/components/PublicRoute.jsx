@@ -13,7 +13,10 @@ export default function PublicRoute({ children }) {
     )
   }
 
-  if (user) return <Navigate to="/dashboard" replace />
+  if (user) {
+    const hasOnboarded = !!user?.user_metadata?.business_name
+    return <Navigate to={hasOnboarded ? '/dashboard' : '/onboarding'} replace />
+  }
 
   return children
 }

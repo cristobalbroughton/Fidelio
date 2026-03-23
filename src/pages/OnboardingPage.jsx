@@ -68,6 +68,9 @@ export default function OnboardingPage() {
     try {
       const slug = generateSlug(form.name)
 
+      console.log('[onboarding] user.id:', user.id)
+      console.log('[onboarding] inserting business:', { owner_id: user.id, name: form.name, slug })
+
       const { data: business, error: bizError } = await supabase
         .from('businesses')
         .insert({
@@ -77,23 +80,26 @@ export default function OnboardingPage() {
           category: form.category,
           description: form.description || null,
           program_name: form.programName,
-          points_rate: form.pointsRate,
+          points_per_clp: form.pointsRate,
           welcome_points: form.welcomePoints,
         })
         .select()
         .single()
 
+      console.log('[onboarding] business result:', { business, bizError })
       if (bizError) throw bizError
 
+      const rewardTypeMap = { producto: 'product', descuento: 'discount' }
       const { error: rewardError } = await supabase
         .from('rewards')
         .insert({
           business_id: business.id,
           name: form.rewardName,
           points_required: form.rewardPoints,
-          type: form.rewardType,
+          type: rewardTypeMap[form.rewardType] ?? form.rewardType,
         })
 
+      console.log('[onboarding] reward result:', { rewardError })
       if (rewardError) throw rewardError
 
       await supabase.auth.updateUser({ data: { business_name: form.name } }).catch(() => {})
