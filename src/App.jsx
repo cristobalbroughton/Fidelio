@@ -12,6 +12,7 @@ import RegisterPage from './pages/RegisterPage'
 import OnboardingPage from './pages/OnboardingPage'
 import HomePage from './pages/dashboard/HomePage'
 import NuevaCompraPage from './pages/dashboard/NuevaCompraPage'
+import ClientesPage from './pages/dashboard/ClientesPage'
 
 // ── Placeholders ──────────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export default function App() {
             <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
               <Route index                  element={<HomePage />} />
               <Route path="nueva-compra"   element={<NuevaCompraPage />} />
-              <Route path="clientes"        element={<Placeholder title="Clientes" />} />
+              <Route path="clientes"        element={<ClientesPage />} />
               <Route path="recompensas"     element={<Placeholder title="Recompensas" />} />
               <Route path="configuracion"   element={<Placeholder title="Configuración" />} />
             </Route>

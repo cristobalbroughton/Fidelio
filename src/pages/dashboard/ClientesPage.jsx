@@ -1,0 +1,408 @@
+import { useState, useEffect } from 'react'
+import { Loader2, Search, Star, X, Users } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatCLP(amount) {
+  return amount.toLocaleString('es-CL')
+}
+
+function formatDateShort(iso) {
+  return new Date(iso).toLocaleDateString('es-CL', {
+    day: 'numeric', month: 'short',
+  })
+}
+
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString('es-CL', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  })
+}
+
+// ── Constantes ────────────────────────────────────────────────────────────────
+
+const INPUT_CLASS =
+  'w-full border border-black/[0.08] rounded-lg px-4 py-3 text-dark placeholder-dark/25 focus:outline-none focus:border-primary/50 transition-colors bg-white'
+
+const TX_TYPE_LABEL = { welcome: 'Bienvenida', earn: 'Compra', redeem: 'Canje' }
+
+const TX_TYPE_COLOR = {
+  welcome: 'text-primary',
+  earn:    'text-emerald-600',
+  redeem:  'text-dark/50',
+}
+
+// ── Componente ────────────────────────────────────────────────────────────────
+
+export default function ClientesPage() {
+  const { user } = useAuth()
+
+  // Business
+  const [business, setBusiness]           = useState(null)
+  const [loadingBusiness, setLB]          = useState(true)
+
+  // Lista clientes
+  const [customers, setCustomers]         = useState([])
+  const [spendMap, setSpendMap]           = useState({})
+  const [loadingList, setLoadingList]     = useState(false)
+
+  // Búsqueda
+  const [search, setSearch]               = useState('')
+
+  // Drawer
+  const [drawerCustomer, setDrawerCustomer] = useState(null)
+  const [drawerTxs, setDrawerTxs]           = useState([])
+  const [loadingDrawer, setLoadingDrawer]   = useState(false)
+  const [drawerOpen, setDrawerOpen]         = useState(false)
+
+  // ── Carga business ──────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!user?.id) return
+    supabase
+      .from('businesses')
+      .select('id, name, points_per_clp, welcome_points')
+      .eq('owner_id', user.id)
+      .single()
+      .then(({ data, error }) => {
+        if (error) toast.error('Error cargando datos del negocio')
+        else setBusiness(data)
+        setLB(false)
+      })
+  }, [user?.id])
+
+  // ── Carga clientes + totales ────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!business?.id) return
+    setLoadingList(true)
+    Promise.all([
+      supabase
+        .from('loyalty_customers')
+        .select('id, name, phone, points_balance, visits_count, last_visit_at')
+        .eq('business_id', business.id)
+        .order('points_balance', { ascending: false }),
+      supabase
+        .from('transactions')
+        .select('customer_id, amount_clp')
+        .eq('business_id', business.id)
+        .eq('type', 'earn'),
+    ]).then(([{ data: custs, error: e1 }, { data: txs, error: e2 }]) => {
+      if (e1 || e2) {
+        toast.error('Error cargando clientes')
+      } else {
+        setCustomers(custs ?? [])
+        const map = {}
+        for (const tx of txs ?? []) {
+          map[tx.customer_id] = (map[tx.customer_id] ?? 0) + tx.amount_clp
+        }
+        setSpendMap(map)
+      }
+      setLoadingList(false)
+    })
+  }, [business?.id])
+
+  // ── Drawer ──────────────────────────────────────────────────────────────────
+
+  const handleOpenDrawer = async (customer) => {
+    setDrawerCustomer(customer)
+    setDrawerTxs([])
+    setDrawerOpen(true)
+    setLoadingDrawer(true)
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, type, points_delta, amount_clp, created_at')
+        .eq('customer_id', customer.id)
+        .eq('business_id', business.id)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setDrawerTxs(data ?? [])
+    } catch (err) {
+      toast.error(err.message ?? 'Error cargando historial')
+    } finally {
+      setLoadingDrawer(false)
+    }
+  }
+
+  const handleCloseDrawer = () => {
+    setDrawerOpen(false)
+    setTimeout(() => { setDrawerCustomer(null); setDrawerTxs([]) }, 300)
+  }
+
+  // ── Derivados ───────────────────────────────────────────────────────────────
+
+  const filtered = customers.filter(c => {
+    const q = search.toLowerCase().trim()
+    if (!q) return true
+    return c.name?.toLowerCase().includes(q) || c.phone.includes(q)
+  })
+
+  // ── Guards ──────────────────────────────────────────────────────────────────
+
+  if (loadingBusiness) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-6 h-6 text-primary animate-spin" />
+      </div>
+    )
+  }
+
+  if (!business) {
+    return (
+      <div className="p-8">
+        <p className="text-dark/40 text-sm">No se encontraron datos del negocio.</p>
+      </div>
+    )
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="p-8 lg:p-10 max-w-6xl">
+
+      {/* Encabezado */}
+      <div className="flex items-end justify-between mb-6">
+        <div>
+          <h1
+            className="text-[26px] font-semibold text-dark tracking-tight"
+            style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
+          >
+            Clientes
+          </h1>
+          <p className="text-dark/45 text-sm mt-1">
+            {customers.length > 0
+              ? `${customers.length} cliente${customers.length !== 1 ? 's' : ''} registrado${customers.length !== 1 ? 's' : ''}`
+              : 'Gestiona tu base de clientes'}
+          </p>
+        </div>
+      </div>
+
+      {/* Buscador */}
+      <div className="mb-5 relative max-w-sm">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-dark/30 pointer-events-none" />
+        <input
+          type="search"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar por nombre o teléfono…"
+          className={INPUT_CLASS + ' pl-10'}
+        />
+      </div>
+
+      {/* Tabla de clientes */}
+      <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-black/[0.06]">
+                {['Cliente', 'Teléfono', 'Puntos', 'Total gastado', 'Visitas', 'Última visita'].map(col => (
+                  <th
+                    key={col}
+                    className="px-5 py-3.5 text-left text-[11px] font-medium text-dark/35 uppercase tracking-[0.08em] whitespace-nowrap"
+                  >
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {/* Skeleton */}
+              {loadingList && Array.from({ length: 3 }).map((_, i) => (
+                <tr key={i} className="border-b border-black/[0.04]">
+                  {[55, 75, 35, 50, 25, 45].map((w, j) => (
+                    <td key={j} className="px-5 py-4">
+                      <div
+                        className="h-3 bg-dark/[0.06] rounded-full animate-pulse"
+                        style={{ width: `${w}%` }}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+
+              {/* Empty state */}
+              {!loadingList && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-5 py-16 text-center">
+                    {search ? (
+                      <>
+                        <Search className="w-8 h-8 text-dark/15 mx-auto mb-3" />
+                        <p className="text-dark/40 text-sm">Sin resultados para &ldquo;{search}&rdquo;</p>
+                      </>
+                    ) : (
+                      <>
+                        <Users className="w-10 h-10 text-dark/15 mx-auto mb-3" />
+                        <p className="text-dark/40 font-medium text-sm">Sin clientes aún</p>
+                        <p className="text-dark/25 text-xs mt-1">
+                          Los clientes aparecerán aquí al registrar su primera compra.
+                        </p>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              )}
+
+              {/* Filas */}
+              {!loadingList && filtered.map(c => (
+                <tr
+                  key={c.id}
+                  onClick={() => handleOpenDrawer(c)}
+                  className="cursor-pointer hover:bg-black/[0.02] transition-colors border-b border-black/[0.04] last:border-0"
+                >
+                  {/* Cliente */}
+                  <td className="px-5 py-4">
+                    <p className="text-[14px] font-semibold text-dark leading-tight">
+                      {c.name ?? c.phone}
+                    </p>
+                    {c.name && (
+                      <p className="text-[12px] text-dark/35 mt-0.5">{c.phone}</p>
+                    )}
+                  </td>
+
+                  {/* Teléfono */}
+                  <td className="px-5 py-4">
+                    <span className="text-sm text-dark/45">{c.phone}</span>
+                  </td>
+
+                  {/* Puntos */}
+                  <td className="px-5 py-4 text-right">
+                    <span className="inline-flex items-center gap-1 text-primary font-semibold text-[14px]">
+                      <Star className="w-3.5 h-3.5 fill-primary" />
+                      {c.points_balance.toLocaleString('es-CL')}
+                    </span>
+                  </td>
+
+                  {/* Total gastado */}
+                  <td className="px-5 py-4 text-right">
+                    <span className="text-[14px] text-dark font-medium">
+                      ${formatCLP(spendMap[c.id] ?? 0)}
+                    </span>
+                  </td>
+
+                  {/* Visitas */}
+                  <td className="px-5 py-4 text-center">
+                    <span className="text-[14px] text-dark/70">{c.visits_count}</span>
+                  </td>
+
+                  {/* Última visita */}
+                  <td className="px-5 py-4 text-right">
+                    <span className="text-sm text-dark/45 whitespace-nowrap">
+                      {c.last_visit_at ? formatDateShort(c.last_visit_at) : '—'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── Drawer ── */}
+
+      {/* Backdrop */}
+      {drawerCustomer && (
+        <div
+          onClick={handleCloseDrawer}
+          className={[
+            'fixed inset-0 bg-black/40 z-40 transition-opacity duration-300',
+            drawerOpen ? 'opacity-100' : 'opacity-0',
+          ].join(' ')}
+        />
+      )}
+
+      {/* Panel */}
+      <div
+        className={[
+          'fixed top-0 right-0 h-full w-full sm:w-96 bg-white z-50',
+          'shadow-2xl flex flex-col transition-transform duration-300 ease-out',
+          drawerOpen ? 'translate-x-0' : 'translate-x-full',
+        ].join(' ')}
+      >
+        {drawerCustomer && (
+          <>
+            {/* Header */}
+            <div className="px-6 pt-6 pb-4 flex items-start justify-between flex-shrink-0">
+              <div>
+                <p className="text-[18px] font-semibold text-dark leading-tight">
+                  {drawerCustomer.name ?? drawerCustomer.phone}
+                </p>
+                {drawerCustomer.name && (
+                  <p className="text-sm text-dark/45 mt-0.5">{drawerCustomer.phone}</p>
+                )}
+              </div>
+              <button
+                onClick={handleCloseDrawer}
+                className="ml-4 mt-0.5 text-dark/35 hover:text-dark transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Badge puntos */}
+            <div className="px-6 pb-4 flex-shrink-0">
+              <span className="inline-flex items-center gap-1.5 bg-primary/[0.08] text-primary text-[13px] font-semibold px-3 py-1.5 rounded-lg">
+                <Star className="w-3.5 h-3.5 fill-primary" />
+                {drawerCustomer.points_balance.toLocaleString('es-CL')} pts
+              </span>
+            </div>
+
+            {/* Divider */}
+            <div className="mx-6 h-px bg-black/[0.06] flex-shrink-0" />
+
+            {/* Label historial */}
+            <p className="px-6 pt-4 pb-2 text-[11px] font-medium text-dark/35 uppercase tracking-[0.08em] flex-shrink-0">
+              Historial de transacciones
+            </p>
+
+            {/* Lista transacciones */}
+            <div className="flex-1 overflow-y-auto px-6 pb-6">
+              {loadingDrawer && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                </div>
+              )}
+
+              {!loadingDrawer && drawerTxs.length === 0 && (
+                <div className="text-center py-10">
+                  <p className="text-dark/35 text-sm">Sin transacciones aún</p>
+                </div>
+              )}
+
+              {!loadingDrawer && drawerTxs.map(tx => (
+                <div
+                  key={tx.id}
+                  className="flex items-center justify-between py-3 border-b border-black/[0.04] last:border-0"
+                >
+                  {/* Izquierda: tipo + fecha */}
+                  <div>
+                    <span className={`text-[13px] font-medium ${TX_TYPE_COLOR[tx.type]}`}>
+                      {TX_TYPE_LABEL[tx.type]}
+                    </span>
+                    <p className="text-[12px] text-dark/35 mt-0.5">{formatDate(tx.created_at)}</p>
+                  </div>
+
+                  {/* Derecha: puntos + monto */}
+                  <div className="text-right">
+                    <p className={`text-[13px] font-semibold ${TX_TYPE_COLOR[tx.type]}`}>
+                      {tx.type === 'redeem' ? '−' : '+'}{tx.points_delta.toLocaleString('es-CL')} pts
+                    </p>
+                    {tx.type === 'earn' && tx.amount_clp > 0 && (
+                      <p className="text-[12px] text-dark/40 mt-0.5">
+                        ${formatCLP(tx.amount_clp)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+    </div>
+  )
+}
