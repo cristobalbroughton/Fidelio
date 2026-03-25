@@ -529,6 +529,7 @@ export default function NuevaCompraPage() {
 
 function QrScannerModal({ business, onClose, onFound }) {
   const scannerRef = useRef(null)
+  const [debugMsg, setDebugMsg] = useState('')
 
   useEffect(() => {
     const scanner = new Html5Qrcode('qr-reader-fidelio')
@@ -538,27 +539,44 @@ function QrScannerModal({ business, onClose, onFound }) {
       { facingMode: 'environment' },
       { fps: 10, qrbox: { width: 240, height: 240 } },
       async (decodedText) => {
+        setDebugMsg(`QR: ${decodedText}`)
+
         const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-        if (!UUID_RE.test(decodedText)) return   // ignorar QRs no-UUID, seguir escaneando
+        if (!UUID_RE.test(decodedText)) {
+          setDebugMsg(`QR: ${decodedText} — no es UUID, ignorando`)
+          return
+        }
 
         await scanner.stop()
+        setDebugMsg(`UUID detectado: ${decodedText} — consultando Supabase…`)
 
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('loyalty_customers')
           .select('id, phone, name, points_balance, visits_count, last_visit_at')
           .eq('id', decodedText)
           .eq('business_id', business.id)
           .maybeSingle()
 
-        if (!data) {
+        if (error) {
+          setDebugMsg(`Error Supabase: ${error.message}`)
           toast.error('Cliente no encontrado en este negocio')
           onClose()
           return
         }
+
+        if (!data) {
+          setDebugMsg(`Sin resultados para id=${decodedText} en business=${business.id}`)
+          toast.error('Cliente no encontrado en este negocio')
+          onClose()
+          return
+        }
+
+        setDebugMsg(`Cliente encontrado: ${data.name ?? data.phone} (${data.id})`)
         onFound(data)
       },
       () => {}   // errores por frame: ignorar silenciosamente
-    ).catch(() => {
+    ).catch((err) => {
+      setDebugMsg(`Error cámara: ${err?.message ?? err}`)
       toast.error('No se pudo acceder a la cámara')
       onClose()
     })
@@ -580,9 +598,14 @@ function QrScannerModal({ business, onClose, onFound }) {
           </button>
         </div>
         <div id="qr-reader-fidelio" className="w-full" />
-        <p className="text-center text-dark/35 text-[12px] px-5 py-3">
+        <p className="text-center text-dark/35 text-[12px] px-5 pt-3">
           Apunta la cámara al código QR del cliente
         </p>
+        {debugMsg && (
+          <p className="mx-4 mb-3 mt-1 text-[11px] font-mono text-dark/50 bg-dark/[0.04] rounded-lg px-3 py-2 break-all">
+            {debugMsg}
+          </p>
+        )}
       </div>
     </div>
   )
