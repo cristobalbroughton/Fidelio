@@ -13,6 +13,7 @@ import OnboardingPage from './pages/OnboardingPage'
 import HomePage from './pages/dashboard/HomePage'
 import NuevaCompraPage from './pages/dashboard/NuevaCompraPage'
 import ClientesPage from './pages/dashboard/ClientesPage'
+import RecompensasPage from './pages/dashboard/RecompensasPage'
 
 // ── Placeholders ──────────────────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ export default function App() {
               <Route index                  element={<HomePage />} />
               <Route path="nueva-compra"   element={<NuevaCompraPage />} />
               <Route path="clientes"        element={<ClientesPage />} />
-              <Route path="recompensas"     element={<Placeholder title="Recompensas" />} />
+              <Route path="recompensas"     element={<RecompensasPage />} />
               <Route path="configuracion"   element={<Placeholder title="Configuración" />} />
             </Route>
 

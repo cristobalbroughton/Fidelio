@@ -31,12 +31,18 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - `businesses`: owner_id, name, slug, category, description, program_name, points_per_clp, welcome_points
 - `loyalty_customers`: business_id, phone, name, points_balance, visits_count, last_visit_at
 - `transactions`: business_id, customer_id, type (welcome|earn|redeem), points_delta, amount_clp, created_at
-- `rewards`: business_id, name, points_required, type (product|discount)
+- `rewards`: business_id, name, description (nullable), points_required, type (product|discount|experience), is_active (boolean, default true)
 
 ## Comandos útiles
 - `npm run dev` — servidor local Vite
 - `npm run build` — build de producción
 - `npm run lint` — ESLint
+
+## Patrones de página
+- Helpers (`formatCLP`, `formatDate`, etc.) se definen inline por archivo — no hay carpeta utils compartida
+- Queries independientes: usar `Promise.all([...])` para evitar waterfall
+- Drawers: animación CSS pura con `translate-x` Tailwind; panel siempre en DOM mientras `drawerCustomer !== null`; `setTimeout(300)` limpia estado tras slide-out
+- Constantes de UI (`TX_TYPE_LABEL`, `INPUT_CLASS`, etc.) a nivel módulo, fuera del componente
 
 ## Convenciones
 - Componentes en `src/components/`, páginas en `src/pages/`
