@@ -15,6 +15,7 @@ import NuevaCompraPage from './pages/dashboard/NuevaCompraPage'
 import ClientesPage from './pages/dashboard/ClientesPage'
 import RecompensasPage from './pages/dashboard/RecompensasPage'
 import MiniWebAppPage from './pages/MiniWebAppPage'
+import AdminPage from './pages/AdminPage'
 
 // ── Placeholders ──────────────────────────────────────────────────────────────
 
@@ -75,6 +76,11 @@ export default function App() {
               <Route path="clientes"        element={<ClientesPage />} />
               <Route path="recompensas"     element={<RecompensasPage />} />
               <Route path="configuracion"   element={<Placeholder title="Configuración" />} />
+            </Route>
+
+            {/* Admin — protegida, con DashboardLayout */}
+            <Route path="/admin" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+              <Route index element={<AdminPage />} />
             </Route>
 
             {/* 404 */}

@@ -25,10 +25,12 @@ SaaS de programas de fidelización white-label para negocios locales chilenos.
 ## Base de datos Supabase
 Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - Supabase: usar async/await directo (no React Query) — TanStack Query instalado pero aún no integrado
+- Supabase count sin data: `.select('*', { count: 'exact', head: true })` → devuelve `{ count, data: null }`; para sumas, seleccionar la columna y reducir en JS
+- Filtros de fecha: `.gte('created_at', isoString)` / `.lte(...)` — siempre pasar `.toISOString()`
 - Row Level Security (RLS) habilitado — cada `business` solo ve sus propios datos
 
 ## Schema Supabase
-- `businesses`: owner_id, name, slug, category, description, program_name, points_per_clp, welcome_points, primary_color (hex)
+- `businesses`: owner_id, name, slug, category, description, program_name, points_per_clp, welcome_points, primary_color (hex), plan (text), last_activity_at (timestamp)
 - `loyalty_customers`: business_id, phone, name, points_balance, visits_count, last_visit_at
 - `transactions`: business_id, customer_id, type (welcome|earn|redeem), points_delta, amount_clp, created_at
 - `rewards`: business_id, name, description (nullable), points_required, type (product|discount|experience), is_active (boolean, default true)
@@ -46,6 +48,7 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - Modal centrado (formularios): backdrop `fixed inset-0 bg-black/40 z-40` + panel `fixed inset-0 flex items-center justify-center z-50`; drawer (historial/readonly): slide-in desde la derecha
 - QR codes: `import { QRCodeSVG } from 'qrcode.react'` (named export, NO default) — qrcode.react v4
 - Theming dinámico por negocio: inyectar `primary_color` como `--accent` CSS variable en el wrapper; usar `style={{ color: 'var(--accent)' }}` o `background: accent` para aplicarlo
+- recharts: `import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'`; siempre envolver en `<ResponsiveContainer width="100%" height={N}>`; color de línea/barra = `#c9a84c`; tooltip dark: `contentStyle: { background: '#1a1a1a', color: '#f4f1ea', border: 'none', borderRadius: 8 }`
 - Mini-webapp dark theme input: `bg-white/[0.06] border border-white/[0.08] text-white placeholder-white/30 rounded-xl` (diferente al INPUT_CLASS del dashboard que usa `bg-white`)
 
 ## Convenciones
@@ -57,3 +60,5 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - Nombre del negocio en sidebar: viene de `user.user_metadata.business_name` (guardado con `supabase.auth.updateUser` en onboarding)
 - PublicRoute redirige a `/onboarding` si `user_metadata.business_name` está vacío, a `/dashboard` si está presente
 - Mini-webapp pública `/c/:slug`: no usa auth, queries anon — RLS debe permitir SELECT anon en `businesses` (by slug), `loyalty_customers` (by business_id), `rewards` (by business_id); e INSERT anon en `loyalty_customers` y `transactions`
+- Admin email: `cristobal.broughton@gmail.com` — guard inline en `AdminPage` con `user.email !== ADMIN_EMAIL` → redirect `/dashboard`; link "Admin" en sidebar condicional al mismo email
+- AdminPage queries sin filtro `business_id` — requiere RLS policy en Supabase: `auth.email() = 'cristobal.broughton@gmail.com'` puede SELECT all en todas las tablas

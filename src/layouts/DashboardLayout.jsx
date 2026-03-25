@@ -7,6 +7,7 @@ import {
   Settings,
   Star,
   LogOut,
+  ShieldCheck,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
@@ -80,26 +81,53 @@ export default function DashboardLayout() {
             >
               {({ isActive }) => (
                 <>
-                  {/* Active bar */}
                   {isActive && (
                     <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-primary" />
                   )}
-
                   <Icon
                     className={[
                       'w-[17px] h-[17px] shrink-0 transition-colors duration-150',
-                      isActive
-                        ? 'text-primary'
-                        : 'text-white/35 group-hover:text-white/65',
+                      isActive ? 'text-primary' : 'text-white/35 group-hover:text-white/65',
                     ].join(' ')}
                     strokeWidth={isActive ? 2.1 : 1.8}
                   />
-
                   {label}
                 </>
               )}
             </NavLink>
           ))}
+
+          {/* Admin link — solo visible para el superadmin */}
+          {user?.email === 'cristobal.broughton@gmail.com' && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                [
+                  'group relative flex items-center gap-3 px-3 rounded-lg text-[13.5px] font-medium',
+                  'transition-all duration-150 select-none min-h-[42px]',
+                  isActive
+                    ? 'text-primary bg-primary/[0.08]'
+                    : 'text-white/45 hover:text-white/80 hover:bg-white/[0.04]',
+                ].join(' ')
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-primary" />
+                  )}
+                  <ShieldCheck
+                    className={[
+                      'w-[17px] h-[17px] shrink-0 transition-colors duration-150',
+                      isActive ? 'text-primary' : 'text-white/35 group-hover:text-white/65',
+                    ].join(' ')}
+                    strokeWidth={isActive ? 2.1 : 1.8}
+                  />
+                  Admin
+                </>
+              )}
+            </NavLink>
+          )}
         </nav>
 
         {/* Bottom: business info + logout */}
