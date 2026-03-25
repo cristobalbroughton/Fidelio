@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Loader2, Search, CheckCircle2, Star, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Loader2, Search, CheckCircle2, Star, X, QrCode } from 'lucide-react'
+import { Html5Qrcode } from 'html5-qrcode'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -62,6 +63,9 @@ export default function NuevaCompraPage() {
   // Operations
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null) // { pointsEarned, newBalance }
+
+  // QR scanner
+  const [qrOpen, setQrOpen] = useState(false)
 
   // Derived
   const amountRaw = Number(amount.replace(/\./g, ''))
@@ -205,6 +209,11 @@ export default function NuevaCompraPage() {
 
       if (updError) throw updError
 
+      await supabase
+        .from('businesses')
+        .update({ last_activity_at: new Date().toISOString() })
+        .eq('id', business.id)
+
       setResult({
         pointsEarned: points,
         newBalance: customer.points_balance + points,
@@ -225,6 +234,22 @@ export default function NuevaCompraPage() {
     setRecentVisits([])
     setAmount('')
     setResult(null)
+  }
+
+  const handleQrFound = async (foundCustomer) => {
+    setQrOpen(false)
+    setCustomer(foundCustomer)
+
+    const { data: visits } = await supabase
+      .from('transactions')
+      .select('created_at, points_delta')
+      .eq('customer_id', foundCustomer.id)
+      .eq('business_id', business.id)
+      .eq('type', 'earn')
+      .order('created_at', { ascending: false })
+      .limit(3)
+    setRecentVisits(visits ?? [])
+    setView('purchase')
   }
 
   // ── Loading business ───────────────────────────────────────────────────────
@@ -289,6 +314,13 @@ export default function NuevaCompraPage() {
                 <Search className="w-4 h-4" />
               )}
               Buscar cliente
+            </button>
+            <button
+              onClick={() => setQrOpen(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dark/[0.12] text-dark/55 hover:text-dark hover:border-dark/25 text-sm font-medium transition-all"
+            >
+              <QrCode className="w-4 h-4" />
+              Escanear QR del cliente
             </button>
           </div>
         )}
@@ -361,9 +393,9 @@ export default function NuevaCompraPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[15px] font-semibold text-dark">
-                  {customer.name ?? normalizePhone(phone)}
+                  {customer.name ?? customer.phone}
                 </p>
-                <p className="text-[13px] text-dark/45 mt-0.5">{normalizePhone(phone)}</p>
+                <p className="text-[13px] text-dark/45 mt-0.5">{customer.phone}</p>
               </div>
               <div className="flex items-center gap-1.5 bg-primary/[0.08] text-primary text-[13px] font-semibold px-3 py-1.5 rounded-lg">
                 <Star className="w-3.5 h-3.5 fill-primary" />
@@ -480,6 +512,77 @@ export default function NuevaCompraPage() {
           </div>
         )}
 
+      </div>
+
+      {qrOpen && (
+        <QrScannerModal
+          business={business}
+          onClose={() => setQrOpen(false)}
+          onFound={handleQrFound}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── QrScannerModal ─────────────────────────────────────────────────────────────
+
+function QrScannerModal({ business, onClose, onFound }) {
+  const scannerRef = useRef(null)
+
+  useEffect(() => {
+    const scanner = new Html5Qrcode('qr-reader-fidelio')
+    scannerRef.current = scanner
+
+    scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 240, height: 240 } },
+      async (decodedText) => {
+        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        if (!UUID_RE.test(decodedText)) return   // ignorar QRs no-UUID, seguir escaneando
+
+        await scanner.stop()
+
+        const { data } = await supabase
+          .from('loyalty_customers')
+          .select('id, phone, name, points_balance, visits_count, last_visit_at')
+          .eq('id', decodedText)
+          .eq('business_id', business.id)
+          .maybeSingle()
+
+        if (!data) {
+          toast.error('Cliente no encontrado en este negocio')
+          onClose()
+          return
+        }
+        onFound(data)
+      },
+      () => {}   // errores por frame: ignorar silenciosamente
+    ).catch(() => {
+      toast.error('No se pudo acceder a la cámara')
+      onClose()
+    })
+
+    return () => {
+      scannerRef.current?.stop().catch(() => {}).finally(() => {
+        scannerRef.current?.clear()
+      })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-black/[0.06]">
+          <p className="text-[14px] font-semibold text-dark">Escanear QR del cliente</p>
+          <button onClick={onClose} className="text-dark/35 hover:text-dark transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div id="qr-reader-fidelio" className="w-full" />
+        <p className="text-center text-dark/35 text-[12px] px-5 py-3">
+          Apunta la cámara al código QR del cliente
+        </p>
       </div>
     </div>
   )
