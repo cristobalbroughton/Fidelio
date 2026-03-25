@@ -14,6 +14,7 @@ import HomePage from './pages/dashboard/HomePage'
 import NuevaCompraPage from './pages/dashboard/NuevaCompraPage'
 import ClientesPage from './pages/dashboard/ClientesPage'
 import RecompensasPage from './pages/dashboard/RecompensasPage'
+import MiniWebAppPage from './pages/MiniWebAppPage'
 
 // ── Placeholders ──────────────────────────────────────────────────────────────
 
@@ -21,22 +22,6 @@ function Placeholder({ title }) {
   return (
     <div className="p-8">
       <p className="text-dark/40 text-sm">{title} — próximamente</p>
-    </div>
-  )
-}
-
-function MiniWebAppPage() {
-  return (
-    <div className="min-h-screen bg-dark flex items-center justify-center">
-      <div className="text-center">
-        <p
-          className="text-primary text-3xl"
-          style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
-        >
-          Fidelio
-        </p>
-        <p className="text-white/40 text-sm mt-2">Mini-webapp del cliente</p>
-      </div>
     </div>
   )
 }

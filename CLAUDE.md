@@ -28,7 +28,7 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - Row Level Security (RLS) habilitado — cada `business` solo ve sus propios datos
 
 ## Schema Supabase
-- `businesses`: owner_id, name, slug, category, description, program_name, points_per_clp, welcome_points
+- `businesses`: owner_id, name, slug, category, description, program_name, points_per_clp, welcome_points, primary_color (hex)
 - `loyalty_customers`: business_id, phone, name, points_balance, visits_count, last_visit_at
 - `transactions`: business_id, customer_id, type (welcome|earn|redeem), points_delta, amount_clp, created_at
 - `rewards`: business_id, name, description (nullable), points_required, type (product|discount|experience), is_active (boolean, default true)
@@ -43,6 +43,10 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - Queries independientes: usar `Promise.all([...])` para evitar waterfall
 - Drawers: animación CSS pura con `translate-x` Tailwind; panel siempre en DOM mientras `drawerCustomer !== null`; `setTimeout(300)` limpia estado tras slide-out
 - Constantes de UI (`TX_TYPE_LABEL`, `INPUT_CLASS`, etc.) a nivel módulo, fuera del componente
+- Modal centrado (formularios): backdrop `fixed inset-0 bg-black/40 z-40` + panel `fixed inset-0 flex items-center justify-center z-50`; drawer (historial/readonly): slide-in desde la derecha
+- QR codes: `import { QRCodeSVG } from 'qrcode.react'` (named export, NO default) — qrcode.react v4
+- Theming dinámico por negocio: inyectar `primary_color` como `--accent` CSS variable en el wrapper; usar `style={{ color: 'var(--accent)' }}` o `background: accent` para aplicarlo
+- Mini-webapp dark theme input: `bg-white/[0.06] border border-white/[0.08] text-white placeholder-white/30 rounded-xl` (diferente al INPUT_CLASS del dashboard que usa `bg-white`)
 
 ## Convenciones
 - Componentes en `src/components/`, páginas en `src/pages/`
@@ -52,3 +56,4 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - Auth: no llamar `navigate()` tras `signIn()`/`signUp()` — PublicRoute/ProtectedRoute redirigen reactivamente al cambiar `user`
 - Nombre del negocio en sidebar: viene de `user.user_metadata.business_name` (guardado con `supabase.auth.updateUser` en onboarding)
 - PublicRoute redirige a `/onboarding` si `user_metadata.business_name` está vacío, a `/dashboard` si está presente
+- Mini-webapp pública `/c/:slug`: no usa auth, queries anon — RLS debe permitir SELECT anon en `businesses` (by slug), `loyalty_customers` (by business_id), `rewards` (by business_id); e INSERT anon en `loyalty_customers` y `transactions`
