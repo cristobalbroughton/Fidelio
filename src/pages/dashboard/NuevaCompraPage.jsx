@@ -548,7 +548,7 @@ function QrScannerModal({ business, onClose, onFound }) {
         }
 
         await scanner.stop()
-        setDebugMsg(`UUID detectado: ${decodedText} — consultando Supabase…`)
+        setDebugMsg(`UUID detectado: ${decodedText} — consultando Supabase… (business_id=${business.id})`)
 
         const { data, error } = await supabase
           .from('loyalty_customers')
@@ -557,21 +557,19 @@ function QrScannerModal({ business, onClose, onFound }) {
           .eq('business_id', business.id)
           .maybeSingle()
 
+        setDebugMsg(`business_id=${business.id} | id=${decodedText} | data=${JSON.stringify(data)} | error=${JSON.stringify(error)}`)
+
         if (error) {
-          setDebugMsg(`Error Supabase: ${error.message}`)
           toast.error('Cliente no encontrado en este negocio')
           onClose()
           return
         }
 
         if (!data) {
-          setDebugMsg(`Sin resultados para id=${decodedText} en business=${business.id}`)
           toast.error('Cliente no encontrado en este negocio')
           onClose()
           return
         }
-
-        setDebugMsg(`Cliente encontrado: ${data.name ?? data.phone} (${data.id})`)
         onFound(data)
       },
       () => {}   // errores por frame: ignorar silenciosamente
