@@ -236,34 +236,19 @@ export default function NuevaCompraPage() {
   }
 
   const handleQrFound = async (foundCustomer) => {
-    try {
-      setQrOpen(false)
-      console.log('[QR] handleQrFound start, foundCustomer:', foundCustomer)
+    setQrOpen(false)
+    setCustomer(foundCustomer)
 
-      toast.success('1: setCustomer llamado')
-      console.log('[QR] setCustomer:', foundCustomer)
-      setCustomer(foundCustomer)
-
-      toast.success('2: query recentVisits')
-      console.log('[QR] querying recentVisits, customer_id:', foundCustomer.id, 'business_id:', business.id)
-      const { data: visits, error: visitsError } = await supabase
-        .from('transactions')
-        .select('created_at, points_delta')
-        .eq('customer_id', foundCustomer.id)
-        .eq('business_id', business.id)
-        .eq('type', 'earn')
-        .order('created_at', { ascending: false })
-        .limit(3)
-      console.log('[QR] recentVisits result:', visits, 'error:', visitsError)
-
-      setRecentVisits(visits ?? [])
-      toast.success('3: setView purchase')
-      console.log('[QR] setView purchase')
-      setView('purchase')
-    } catch (err) {
-      console.error('[QR] handleQrFound error:', err)
-      toast.error(`Error: ${err?.message ?? String(err)}`)
-    }
+    const { data: visits } = await supabase
+      .from('transactions')
+      .select('created_at, points_delta')
+      .eq('customer_id', foundCustomer.id)
+      .eq('business_id', business.id)
+      .eq('type', 'earn')
+      .order('created_at', { ascending: false })
+      .limit(3)
+    setRecentVisits(visits ?? [])
+    setView('purchase')
   }
 
   // ── Loading business ───────────────────────────────────────────────────────
@@ -544,9 +529,6 @@ export default function NuevaCompraPage() {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function QrScannerModal({ business, onClose, onFound }) {
-  const [debugMsg, setDebugMsg] = useState(
-    `biz keys: ${Object.keys(business).join(',')} | id=${business.id}`
-  )
   const [fallback, setFallback] = useState(false)
   const [manualId, setManualId] = useState('')
   const [querying, setQuerying] = useState(false)
@@ -556,18 +538,12 @@ function QrScannerModal({ business, onClose, onFound }) {
   const detectedRef = useRef(false)
 
   const queryCustomer = async (uuid) => {
-    setDebugMsg(prev => prev + `\nconsultando biz=${business.id} id=${uuid}`)
     const { data, error } = await supabase
       .from('loyalty_customers')
       .select('id, phone, name, points_balance, visits_count, last_visit_at')
       .eq('id', uuid)
       .eq('business_id', business.id)
       .maybeSingle()
-
-    const errStr = error
-      ? `code=${error.code} msg=${error.message} details=${error.details}`
-      : 'ninguno'
-    setDebugMsg(prev => prev + `\ndata=${data ? 'ENCONTRADO' : 'NULL'} error=${errStr}`)
 
     if (error || !data) {
       toast.error('Cliente no encontrado en este negocio')
@@ -580,11 +556,8 @@ function QrScannerModal({ business, onClose, onFound }) {
   useEffect(() => {
     if (!('BarcodeDetector' in window)) {
       setFallback(true)
-      setDebugMsg(prev => prev + '\nBarcodeDetector no disponible — modo manual')
       return
     }
-
-    setDebugMsg(prev => prev + '\nBarcodeDetector OK, solicitando cámara…')
 
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       .then(stream => {
@@ -593,7 +566,6 @@ function QrScannerModal({ business, onClose, onFound }) {
         if (!video) return
         video.srcObject = stream
         video.play()
-        setDebugMsg(prev => prev + '\ncámara activa, escaneando…')
 
         const detector = new window.BarcodeDetector({ formats: ['qr_code'] })
 
@@ -604,7 +576,6 @@ function QrScannerModal({ business, onClose, onFound }) {
               const barcodes = await detector.detect(video)
               if (barcodes.length > 0) {
                 const raw = barcodes[0].rawValue
-                setDebugMsg(prev => prev + `\nQR: ${raw}`)
                 if (UUID_RE.test(raw)) {
                   detectedRef.current = true
                   await queryCustomer(raw)
@@ -617,8 +588,7 @@ function QrScannerModal({ business, onClose, onFound }) {
         }
         rafRef.current = requestAnimationFrame(scan)
       })
-      .catch(err => {
-        setDebugMsg(prev => prev + `\nError cámara: ${err.message}`)
+      .catch(() => {
         setFallback(true)
       })
 
@@ -689,12 +659,7 @@ function QrScannerModal({ business, onClose, onFound }) {
           </div>
         )}
 
-        {/* Debug */}
-        {debugMsg && (
-          <p className="mx-4 mb-3 mt-1 text-[11px] font-mono text-dark/50 bg-dark/[0.04] rounded-lg px-3 py-2 break-all whitespace-pre-wrap">
-            {debugMsg}
-          </p>
-        )}
+
       </div>
     </div>
   )
