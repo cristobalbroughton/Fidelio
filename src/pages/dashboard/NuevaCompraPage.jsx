@@ -557,7 +557,11 @@ function QrScannerModal({ business, onClose, onFound }) {
           .eq('business_id', business.id)
           .maybeSingle()
 
-        setDebugMsg(`business_id=${business.id} | id=${decodedText} | data=${JSON.stringify(data)} | error=${JSON.stringify(error)}`)
+        const errStr = error
+          ? `code=${error.code} msg=${error.message} details=${error.details} hint=${error.hint}`
+          : 'null'
+        const dataStr = data ? JSON.stringify(data) : 'null'
+        setDebugMsg(`biz=${business.id}\nid=${decodedText}\ndata=${dataStr}\nerror=${errStr}`)
 
         if (error) {
           toast.error('Cliente no encontrado en este negocio')
@@ -600,7 +604,7 @@ function QrScannerModal({ business, onClose, onFound }) {
           Apunta la cámara al código QR del cliente
         </p>
         {debugMsg && (
-          <p className="mx-4 mb-3 mt-1 text-[11px] font-mono text-dark/50 bg-dark/[0.04] rounded-lg px-3 py-2 break-all">
+          <p className="mx-4 mb-3 mt-1 text-[11px] font-mono text-dark/50 bg-dark/[0.04] rounded-lg px-3 py-2 break-all whitespace-pre-wrap">
             {debugMsg}
           </p>
         )}
