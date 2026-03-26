@@ -15,7 +15,7 @@ SaaS de programas de fidelización white-label para negocios locales chilenos.
 - React 19 + Vite 8 + React Router DOM 7 + TanStack Query 5
 - Supabase (auth + DB + realtime) — `@supabase/supabase-js` v2
 - Tailwind CSS 4 — tokens en `src/index.css` vía `@theme {}` (NO en tailwind.config.js); postcss usa `@tailwindcss/postcss`
-- lucide-react (iconos), recharts (gráficos), qrcode.react (QR), react-hot-toast (toasts), date-fns (fechas)
+- lucide-react (iconos), recharts (gráficos), qrcode.react (QR), react-hot-toast (toasts), date-fns (fechas), html5-qrcode (instalado pero NO usar — reemplazado por BarcodeDetector nativo)
 
 ## Colores de marca (definidos en src/index.css vía @theme — Tailwind v4)
 - Negro: `#0f0f0f` → `bg-dark` / `text-dark`
@@ -62,3 +62,21 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - Mini-webapp pública `/c/:slug`: no usa auth, queries anon — RLS debe permitir SELECT anon en `businesses` (by slug), `loyalty_customers` (by business_id), `rewards` (by business_id); e INSERT anon en `loyalty_customers` y `transactions`
 - Admin email: `cristobal.broughton@gmail.com` — guard inline en `AdminPage` con `user.email !== ADMIN_EMAIL` → redirect `/dashboard`; link "Admin" en sidebar condicional al mismo email
 - AdminPage queries sin filtro `business_id` — requiere RLS policy en Supabase: `auth.email() = 'cristobal.broughton@gmail.com'` puede SELECT all en todas las tablas
+
+## NuevaCompraPage — flujo completo
+- Vista `purchase` carga recentVisits + rewards activas en paralelo con `Promise.all` al entrar (tanto por teléfono como por QR)
+- Sección "Canjear recompensa" en vista `purchase`: recompensas disponibles con botón "Canjear" (badge dorado), bloqueadas en gris con "Faltan X pts"
+- Modal de confirmación de canje: `redeemTarget` state + backdrop `z-40` + panel `z-50`; re-fetch de `points_balance` antes de ejecutar (race condition protection)
+- `handleRedeem`: INSERT `type='redeem'`, `points_delta` negativo, `reward_id`; UPDATE `loyalty_customers` solo `points_balance` (no `visits_count`); UPDATE `businesses.last_activity_at`
+- `result` tiene campo `type: 'earn' | 'redeem'` — vista success bifurcada por este campo
+- `transactions` requiere columna `reward_id uuid REFERENCES rewards(id)` (nullable) — añadir en Supabase con `ALTER TABLE transactions ADD COLUMN reward_id uuid REFERENCES rewards(id)`
+
+## QR Scanner (NuevaCompraPage)
+- Usa API nativa `BarcodeDetector` + `getUserMedia` — NO usar html5-qrcode (falla silenciosamente en móvil)
+- Patrón: `if (!('BarcodeDetector' in window))` → fallback a input manual de UUID
+- Loop de escaneo con `requestAnimationFrame`; `detectedRef` previene detecciones múltiples
+- Cleanup: `cancelAnimationFrame` + `stream.getTracks().forEach(t => t.stop())`
+- `facingMode: 'environment'` selecciona cámara trasera en móvil, webcam en desktop
+- Al encontrar cliente por QR: buscar en `loyalty_customers` por `id` + `business_id` con `.maybeSingle()` — nunca `.single()` (PGRST116 si no hay resultado)
+- Vista `purchase` usa `customer.phone` directamente, NO `normalizePhone(phone)` — el estado `phone` puede estar vacío si se llegó por QR
+- `handleCredit` actualiza `businesses.last_activity_at = now()` después de cada compra exitosa

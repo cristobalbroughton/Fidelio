@@ -63,6 +63,11 @@ export default function NuevaCompraPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null) // { pointsEarned, newBalance }
 
+  // Rewards & redeem
+  const [rewards, setRewards]           = useState([])
+  const [redeemTarget, setRedeemTarget] = useState(null)
+  const [redeeming, setRedeeming]       = useState(false)
+
   // QR scanner
   const [qrOpen, setQrOpen] = useState(false)
 
@@ -107,16 +112,23 @@ export default function NuevaCompraPage() {
       if (data) {
         setCustomer(data)
 
-        const { data: visits } = await supabase
-          .from('transactions')
-          .select('created_at, points_delta')
-          .eq('customer_id', data.id)
-          .eq('business_id', business.id)
-          .eq('type', 'earn')
-          .order('created_at', { ascending: false })
-          .limit(3)
+        const [{ data: visits }, { data: rewardsData }] = await Promise.all([
+          supabase.from('transactions')
+            .select('created_at, points_delta')
+            .eq('customer_id', data.id)
+            .eq('business_id', business.id)
+            .eq('type', 'earn')
+            .order('created_at', { ascending: false })
+            .limit(3),
+          supabase.from('rewards')
+            .select('id, name, points_required')
+            .eq('business_id', business.id)
+            .eq('is_active', true)
+            .order('points_required', { ascending: true }),
+        ])
 
         setRecentVisits(visits ?? [])
+        setRewards(rewardsData ?? [])
         setView('purchase')
       } else {
         setView('new-customer')
@@ -161,10 +173,7 @@ export default function NuevaCompraPage() {
 
       if (txError) throw txError
 
-      setResult({
-        pointsEarned: business.welcome_points,
-        newBalance: business.welcome_points,
-      })
+      setResult({ type: 'earn', pointsEarned: business.welcome_points, newBalance: business.welcome_points })
       setView('success')
     } catch (err) {
       toast.error(err.message ?? 'Error al registrar cliente')
@@ -213,10 +222,7 @@ export default function NuevaCompraPage() {
         .update({ last_activity_at: new Date().toISOString() })
         .eq('id', business.id)
 
-      setResult({
-        pointsEarned: points,
-        newBalance: customer.points_balance + points,
-      })
+      setResult({ type: 'earn', pointsEarned: points, newBalance: customer.points_balance + points })
       setView('success')
     } catch (err) {
       toast.error(err.message ?? 'Error al acreditar puntos')
@@ -231,24 +237,81 @@ export default function NuevaCompraPage() {
     setCustomerName('')
     setCustomer(null)
     setRecentVisits([])
+    setRewards([])
     setAmount('')
     setResult(null)
+    setRedeemTarget(null)
   }
 
   const handleQrFound = async (foundCustomer) => {
     setQrOpen(false)
     setCustomer(foundCustomer)
 
-    const { data: visits } = await supabase
-      .from('transactions')
-      .select('created_at, points_delta')
-      .eq('customer_id', foundCustomer.id)
-      .eq('business_id', business.id)
-      .eq('type', 'earn')
-      .order('created_at', { ascending: false })
-      .limit(3)
+    const [{ data: visits }, { data: rewardsData }] = await Promise.all([
+      supabase.from('transactions')
+        .select('created_at, points_delta')
+        .eq('customer_id', foundCustomer.id)
+        .eq('business_id', business.id)
+        .eq('type', 'earn')
+        .order('created_at', { ascending: false })
+        .limit(3),
+      supabase.from('rewards')
+        .select('id, name, points_required')
+        .eq('business_id', business.id)
+        .eq('is_active', true)
+        .order('points_required', { ascending: true }),
+    ])
     setRecentVisits(visits ?? [])
+    setRewards(rewardsData ?? [])
     setView('purchase')
+  }
+
+  const handleRedeem = async () => {
+    if (!customer || !redeemTarget) return
+    setRedeeming(true)
+    try {
+      const { data: fresh, error: fetchErr } = await supabase
+        .from('loyalty_customers')
+        .select('points_balance')
+        .eq('id', customer.id)
+        .single()
+      if (fetchErr) throw fetchErr
+
+      if (fresh.points_balance < redeemTarget.points_required) {
+        toast.error('El cliente no tiene suficientes puntos')
+        setRedeemTarget(null)
+        return
+      }
+
+      const newBalance = fresh.points_balance - redeemTarget.points_required
+
+      const { error: txErr } = await supabase.from('transactions').insert({
+        business_id:  business.id,
+        customer_id:  customer.id,
+        type:         'redeem',
+        points_delta: -redeemTarget.points_required,
+        amount_clp:   0,
+        reward_id:    redeemTarget.id,
+      })
+      if (txErr) throw txErr
+
+      const { error: updErr } = await supabase.from('loyalty_customers')
+        .update({ points_balance: newBalance })
+        .eq('id', customer.id)
+      if (updErr) throw updErr
+
+      await supabase.from('businesses')
+        .update({ last_activity_at: new Date().toISOString() })
+        .eq('id', business.id)
+
+      setResult({ type: 'redeem', rewardName: redeemTarget.name, pointsSpent: redeemTarget.points_required, newBalance })
+      setRedeemTarget(null)
+      setView('success')
+    } catch (err) {
+      toast.error(err.message ?? 'Error al procesar canje')
+    } finally {
+      setRedeeming(false)
+    }
   }
 
   // ── Loading business ───────────────────────────────────────────────────────
@@ -462,56 +525,176 @@ export default function NuevaCompraPage() {
             >
               Cancelar
             </button>
+
+            {/* Rewards */}
+            {rewards.length > 0 && (
+              <>
+                <div className="h-px bg-black/[0.06]" />
+                <div>
+                  <p className="text-[12px] font-medium text-dark/35 uppercase tracking-[0.08em] mb-3">
+                    Canjear recompensa
+                  </p>
+                  <div className="space-y-2">
+                    {rewards.map(r => {
+                      const canRedeem = customer.points_balance >= r.points_required
+                      const missing = r.points_required - customer.points_balance
+                      return (
+                        <div
+                          key={r.id}
+                          className="flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-dark/[0.02] border border-black/[0.05]"
+                        >
+                          <div className="min-w-0">
+                            <p className={`text-[13px] font-medium truncate ${canRedeem ? 'text-dark' : 'text-dark/35'}`}>
+                              {r.name}
+                            </p>
+                            <p className="text-[11px] text-dark/35 mt-0.5 tabular-nums">
+                              {r.points_required.toLocaleString('es-CL')} pts
+                            </p>
+                          </div>
+                          {canRedeem ? (
+                            <button
+                              onClick={() => setRedeemTarget(r)}
+                              className="shrink-0 flex items-center gap-1.5 bg-primary/[0.08] text-primary text-[12px] font-semibold px-3 py-1.5 rounded-lg hover:bg-primary/[0.14] transition-colors"
+                            >
+                              <Star className="w-3 h-3 fill-primary" />
+                              Canjear
+                            </button>
+                          ) : (
+                            <span className="shrink-0 text-[11px] text-dark/30 tabular-nums whitespace-nowrap">
+                              Faltan {missing.toLocaleString('es-CL')} pts
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
         {/* ── VIEW: success ─────────────────────────────────────────────────── */}
-        {view === 'success' && result && (
+        {view === 'success' && result && result.type === 'earn' && (
           <div className="text-center py-4 space-y-5">
             <div className="flex items-center justify-center">
-              <CheckCircle2
-                className="w-14 h-14 text-primary"
-                strokeWidth={1.5}
-              />
+              <CheckCircle2 className="w-14 h-14 text-primary" strokeWidth={1.5} />
             </div>
-
-            <div>
-              <p
-                className="text-[22px] font-semibold text-dark"
-                style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
-              >
-                ¡Puntos acreditados!
-              </p>
-            </div>
-
+            <p className="text-[22px] font-semibold text-dark" style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
+              ¡Puntos acreditados!
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-cream rounded-xl p-4">
                 <p className="text-[12px] text-dark/40 font-medium mb-1">Puntos ganados</p>
-                <p
-                  className="text-[32px] leading-none text-primary tabular-nums"
-                  style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
-                >
+                <p className="text-[32px] leading-none text-primary tabular-nums" style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
                   +{result.pointsEarned.toLocaleString('es-CL')}
                 </p>
               </div>
               <div className="bg-cream rounded-xl p-4">
                 <p className="text-[12px] text-dark/40 font-medium mb-1">Nuevo balance</p>
-                <p
-                  className="text-[32px] leading-none text-dark tabular-nums"
-                  style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
-                >
+                <p className="text-[32px] leading-none text-dark tabular-nums" style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
                   {result.newBalance.toLocaleString('es-CL')}
                 </p>
               </div>
             </div>
+            <button onClick={handleReset} className={BTN_PRIMARY}>Nueva compra</button>
+          </div>
+        )}
 
-            <button onClick={handleReset} className={BTN_PRIMARY}>
-              Nueva compra
-            </button>
+        {view === 'success' && result && result.type === 'redeem' && (
+          <div className="text-center py-4 space-y-5">
+            <div className="flex items-center justify-center">
+              <CheckCircle2 className="w-14 h-14 text-primary" strokeWidth={1.5} />
+            </div>
+            <p className="text-[22px] font-semibold text-dark" style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
+              ¡Canje exitoso!
+            </p>
+            <div className="bg-primary/[0.06] border border-primary/[0.12] rounded-xl p-4 text-left">
+              <p className="text-[11px] text-dark/40 font-medium uppercase tracking-wider mb-1">Recompensa canjeada</p>
+              <p className="text-[15px] font-semibold text-dark">{result.rewardName}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-cream rounded-xl p-4">
+                <p className="text-[12px] text-dark/40 font-medium mb-1">Puntos descontados</p>
+                <p className="text-[32px] leading-none text-red-500 tabular-nums" style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
+                  −{result.pointsSpent.toLocaleString('es-CL')}
+                </p>
+              </div>
+              <div className="bg-cream rounded-xl p-4">
+                <p className="text-[12px] text-dark/40 font-medium mb-1">Nuevo balance</p>
+                <p className="text-[32px] leading-none text-dark tabular-nums" style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
+                  {result.newBalance.toLocaleString('es-CL')}
+                </p>
+              </div>
+            </div>
+            <button onClick={handleReset} className={BTN_PRIMARY}>Nueva operación</button>
           </div>
         )}
 
       </div>
+
+      {redeemTarget && customer && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/40 z-40"
+            onClick={() => !redeeming && setRedeemTarget(null)}
+          />
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+
+              <div>
+                <p className="text-[11px] font-medium text-dark/35 uppercase tracking-wider mb-1">
+                  Confirmar canje
+                </p>
+                <p className="text-[18px] font-semibold text-dark leading-snug">
+                  {redeemTarget.name}
+                </p>
+              </div>
+
+              <div className="bg-cream rounded-xl p-4 space-y-2.5">
+                <div className="flex justify-between text-[13px]">
+                  <span className="text-dark/55">Cliente</span>
+                  <span className="font-medium text-dark">{customer.name ?? customer.phone}</span>
+                </div>
+                <div className="flex justify-between text-[13px]">
+                  <span className="text-dark/55">Puntos actuales</span>
+                  <span className="font-medium text-dark tabular-nums">
+                    {customer.points_balance.toLocaleString('es-CL')}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[13px]">
+                  <span className="text-dark/55">Se descontarán</span>
+                  <span className="font-semibold text-red-500 tabular-nums">
+                    −{redeemTarget.points_required.toLocaleString('es-CL')} pts
+                  </span>
+                </div>
+                <div className="h-px bg-black/[0.06]" />
+                <div className="flex justify-between text-[13px]">
+                  <span className="text-dark/55">Nuevo balance</span>
+                  <span className="font-semibold text-primary tabular-nums">
+                    {(customer.points_balance - redeemTarget.points_required).toLocaleString('es-CL')} pts
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <button onClick={handleRedeem} disabled={redeeming} className={BTN_PRIMARY}>
+                  {redeeming && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Confirmar canje
+                </button>
+                <button
+                  onClick={() => setRedeemTarget(null)}
+                  disabled={redeeming}
+                  className="w-full text-center text-[13px] text-dark/35 hover:text-dark/60 transition-colors py-1"
+                >
+                  Cancelar
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </>
+      )}
 
       {qrOpen && business && (
         <QrScannerModal
