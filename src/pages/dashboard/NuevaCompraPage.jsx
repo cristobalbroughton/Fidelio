@@ -514,7 +514,7 @@ export default function NuevaCompraPage() {
 
       </div>
 
-      {qrOpen && (
+      {qrOpen && business && (
         <QrScannerModal
           business={business}
           onClose={() => setQrOpen(false)}
@@ -529,7 +529,7 @@ export default function NuevaCompraPage() {
 
 function QrScannerModal({ business, onClose, onFound }) {
   const scannerRef = useRef(null)
-  const [debugMsg, setDebugMsg] = useState('')
+  const [debugMsg, setDebugMsg] = useState(`business keys: ${Object.keys(business).join(',')} | id=${business.id}`)
 
   useEffect(() => {
     const scanner = new Html5Qrcode('qr-reader-fidelio')
