@@ -237,19 +237,34 @@ export default function NuevaCompraPage() {
   }
 
   const handleQrFound = async (foundCustomer) => {
-    setQrOpen(false)
-    setCustomer(foundCustomer)
+    try {
+      setQrOpen(false)
+      console.log('[QR] handleQrFound start, foundCustomer:', foundCustomer)
 
-    const { data: visits } = await supabase
-      .from('transactions')
-      .select('created_at, points_delta')
-      .eq('customer_id', foundCustomer.id)
-      .eq('business_id', business.id)
-      .eq('type', 'earn')
-      .order('created_at', { ascending: false })
-      .limit(3)
-    setRecentVisits(visits ?? [])
-    setView('purchase')
+      toast.success('1: setCustomer llamado')
+      console.log('[QR] setCustomer:', foundCustomer)
+      setCustomer(foundCustomer)
+
+      toast.success('2: query recentVisits')
+      console.log('[QR] querying recentVisits, customer_id:', foundCustomer.id, 'business_id:', business.id)
+      const { data: visits, error: visitsError } = await supabase
+        .from('transactions')
+        .select('created_at, points_delta')
+        .eq('customer_id', foundCustomer.id)
+        .eq('business_id', business.id)
+        .eq('type', 'earn')
+        .order('created_at', { ascending: false })
+        .limit(3)
+      console.log('[QR] recentVisits result:', visits, 'error:', visitsError)
+
+      setRecentVisits(visits ?? [])
+      toast.success('3: setView purchase')
+      console.log('[QR] setView purchase')
+      setView('purchase')
+    } catch (err) {
+      console.error('[QR] handleQrFound error:', err)
+      toast.error(`Error: ${err?.message ?? String(err)}`)
+    }
   }
 
   // ── Loading business ───────────────────────────────────────────────────────
