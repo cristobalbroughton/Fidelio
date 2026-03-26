@@ -577,6 +577,7 @@ function QrScannerModal({ business, onClose, onFound }) {
           : 'null'
         const dataStr = data ? JSON.stringify(data) : 'null'
         setDebugMsg(`biz=${business.id}\nid=${decodedText}\ndata=${dataStr}\nerror=${errStr}`)
+        setDebugMsg(prev => prev + ' | query completa: data=' + (data ? 'ENCONTRADO' : 'NULL') + ' error=' + (error ? error.code : 'ninguno'))
 
         if (error) {
           toast.error('Cliente no encontrado en este negocio')
