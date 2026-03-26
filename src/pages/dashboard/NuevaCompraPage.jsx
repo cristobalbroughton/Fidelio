@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { Loader2, Search, CheckCircle2, Star, X, QrCode } from 'lucide-react'
-import { Html5Qrcode } from 'html5-qrcode'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -542,83 +541,155 @@ export default function NuevaCompraPage() {
 
 // ── QrScannerModal ─────────────────────────────────────────────────────────────
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 function QrScannerModal({ business, onClose, onFound }) {
-  const scannerRef = useRef(null)
-  const [debugMsg, setDebugMsg] = useState(`business keys: ${Object.keys(business).join(',')} | id=${business.id}`)
+  const [debugMsg, setDebugMsg] = useState(
+    `biz keys: ${Object.keys(business).join(',')} | id=${business.id}`
+  )
+  const [fallback, setFallback] = useState(false)
+  const [manualId, setManualId] = useState('')
+  const [querying, setQuerying] = useState(false)
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
+  const rafRef = useRef(null)
+  const detectedRef = useRef(false)
+
+  const queryCustomer = async (uuid) => {
+    setDebugMsg(prev => prev + `\nconsultando biz=${business.id} id=${uuid}`)
+    const { data, error } = await supabase
+      .from('loyalty_customers')
+      .select('id, phone, name, points_balance, visits_count, last_visit_at')
+      .eq('id', uuid)
+      .eq('business_id', business.id)
+      .maybeSingle()
+
+    const errStr = error
+      ? `code=${error.code} msg=${error.message} details=${error.details}`
+      : 'ninguno'
+    setDebugMsg(prev => prev + `\ndata=${data ? 'ENCONTRADO' : 'NULL'} error=${errStr}`)
+
+    if (error || !data) {
+      toast.error('Cliente no encontrado en este negocio')
+      onClose()
+      return
+    }
+    onFound(data)
+  }
 
   useEffect(() => {
-    const scanner = new Html5Qrcode('qr-reader-fidelio')
-    scannerRef.current = scanner
+    if (!('BarcodeDetector' in window)) {
+      setFallback(true)
+      setDebugMsg(prev => prev + '\nBarcodeDetector no disponible — modo manual')
+      return
+    }
 
-    scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 240, height: 240 } },
-      async (decodedText) => {
-        setDebugMsg(`QR: ${decodedText}`)
+    setDebugMsg(prev => prev + '\nBarcodeDetector OK, solicitando cámara…')
 
-        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-        if (!UUID_RE.test(decodedText)) {
-          setDebugMsg(`QR: ${decodedText} — no es UUID, ignorando`)
-          return
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(stream => {
+        streamRef.current = stream
+        const video = videoRef.current
+        if (!video) return
+        video.srcObject = stream
+        video.play()
+        setDebugMsg(prev => prev + '\ncámara activa, escaneando…')
+
+        const detector = new window.BarcodeDetector({ formats: ['qr_code'] })
+
+        const scan = async () => {
+          if (detectedRef.current) return
+          try {
+            if (video.readyState >= 2) {
+              const barcodes = await detector.detect(video)
+              if (barcodes.length > 0) {
+                const raw = barcodes[0].rawValue
+                setDebugMsg(prev => prev + `\nQR: ${raw}`)
+                if (UUID_RE.test(raw)) {
+                  detectedRef.current = true
+                  await queryCustomer(raw)
+                  return
+                }
+              }
+            }
+          } catch { /* ignorar errores por frame */ }
+          rafRef.current = requestAnimationFrame(scan)
         }
-
-        await scanner.stop()
-        setDebugMsg(`UUID detectado: ${decodedText} — consultando Supabase… (business_id=${business.id})`)
-
-        const { data, error } = await supabase
-          .from('loyalty_customers')
-          .select('id, phone, name, points_balance, visits_count, last_visit_at')
-          .eq('id', decodedText)
-          .eq('business_id', business.id)
-          .maybeSingle()
-
-        const errStr = error
-          ? `code=${error.code} msg=${error.message} details=${error.details} hint=${error.hint}`
-          : 'null'
-        const dataStr = data ? JSON.stringify(data) : 'null'
-        setDebugMsg(`biz=${business.id}\nid=${decodedText}\ndata=${dataStr}\nerror=${errStr}`)
-        setDebugMsg(prev => prev + ' | query completa: data=' + (data ? 'ENCONTRADO' : 'NULL') + ' error=' + (error ? error.code : 'ninguno'))
-
-        if (error) {
-          toast.error('Cliente no encontrado en este negocio')
-          onClose()
-          return
-        }
-
-        if (!data) {
-          toast.error('Cliente no encontrado en este negocio')
-          onClose()
-          return
-        }
-        onFound(data)
-      },
-      () => {}   // errores por frame: ignorar silenciosamente
-    ).catch((err) => {
-      setDebugMsg(`Error cámara: ${err?.message ?? err}`)
-      toast.error('No se pudo acceder a la cámara')
-      onClose()
-    })
+        rafRef.current = requestAnimationFrame(scan)
+      })
+      .catch(err => {
+        setDebugMsg(prev => prev + `\nError cámara: ${err.message}`)
+        setFallback(true)
+      })
 
     return () => {
-      scannerRef.current?.stop().catch(() => {}).finally(() => {
-        scannerRef.current?.clear()
-      })
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      streamRef.current?.getTracks().forEach(t => t.stop())
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleManualSubmit = async () => {
+    const trimmed = manualId.trim()
+    if (!UUID_RE.test(trimmed)) {
+      toast.error('El ID ingresado no es un UUID válido')
+      return
+    }
+    setQuerying(true)
+    await queryCustomer(trimmed)
+    setQuerying(false)
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl">
+
+        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/[0.06]">
           <p className="text-[14px] font-semibold text-dark">Escanear QR del cliente</p>
           <button onClick={onClose} className="text-dark/35 hover:text-dark transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div id="qr-reader-fidelio" className="w-full" />
-        <p className="text-center text-dark/35 text-[12px] px-5 pt-3">
-          Apunta la cámara al código QR del cliente
-        </p>
+
+        {/* Cámara o fallback manual */}
+        {!fallback ? (
+          <>
+            <video
+              ref={videoRef}
+              className="w-full aspect-square object-cover bg-black"
+              muted
+              playsInline
+            />
+            <p className="text-center text-dark/35 text-[12px] px-5 pt-3">
+              Apunta la cámara al código QR del cliente
+            </p>
+          </>
+        ) : (
+          <div className="px-5 py-4 space-y-3">
+            <p className="text-[13px] text-dark/55">
+              Ingresa o pega el ID del cliente:
+            </p>
+            <input
+              type="text"
+              value={manualId}
+              onChange={e => setManualId(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !querying && handleManualSubmit()}
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              className={INPUT_CLASS + ' font-mono text-[12px]'}
+              autoFocus
+            />
+            <button
+              onClick={handleManualSubmit}
+              disabled={querying || !manualId.trim()}
+              className={BTN_PRIMARY}
+            >
+              {querying && <Loader2 className="w-4 h-4 animate-spin" />}
+              Buscar cliente
+            </button>
+          </div>
+        )}
+
+        {/* Debug */}
         {debugMsg && (
           <p className="mx-4 mb-3 mt-1 text-[11px] font-mono text-dark/50 bg-dark/[0.04] rounded-lg px-3 py-2 break-all whitespace-pre-wrap">
             {debugMsg}
