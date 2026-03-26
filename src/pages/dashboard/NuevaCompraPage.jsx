@@ -114,10 +114,9 @@ export default function NuevaCompraPage() {
 
         const [{ data: visits }, { data: rewardsData }] = await Promise.all([
           supabase.from('transactions')
-            .select('created_at, points_delta')
+            .select('created_at, points_delta, type, rewards(name)')
             .eq('customer_id', data.id)
             .eq('business_id', business.id)
-            .eq('type', 'earn')
             .order('created_at', { ascending: false })
             .limit(3),
           supabase.from('rewards')
@@ -249,10 +248,9 @@ export default function NuevaCompraPage() {
 
     const [{ data: visits }, { data: rewardsData }] = await Promise.all([
       supabase.from('transactions')
-        .select('created_at, points_delta')
+        .select('created_at, points_delta, type, rewards(name)')
         .eq('customer_id', foundCustomer.id)
         .eq('business_id', business.id)
-        .eq('type', 'earn')
         .order('created_at', { ascending: false })
         .limit(3),
       supabase.from('rewards')
@@ -465,21 +463,33 @@ export default function NuevaCompraPage() {
               </div>
             </div>
 
-            {/* Recent visits */}
+            {/* Recent transactions */}
             <div>
               <p className="text-[12px] font-medium text-dark/35 uppercase tracking-[0.08em] mb-2">
-                Últimas visitas
+                Últimas transacciones
               </p>
               {recentVisits.length === 0 ? (
-                <p className="text-[13px] text-dark/35 italic">Sin visitas previas</p>
+                <p className="text-[13px] text-dark/35 italic">Sin transacciones previas</p>
               ) : (
-                <div className="space-y-1">
-                  {recentVisits.map((v, i) => (
-                    <div key={i} className="flex items-center justify-between text-[13px]">
-                      <span className="text-dark/55">{formatDate(v.created_at)}</span>
-                      <span className="text-primary font-medium">+{v.points_delta} pts</span>
-                    </div>
-                  ))}
+                <div className="space-y-1.5">
+                  {recentVisits.map((v, i) => {
+                    const isRedeem = v.type === 'redeem'
+                    return (
+                      <div key={i} className="flex items-start justify-between gap-2 text-[13px]">
+                        <div className="min-w-0">
+                          <span className="text-dark/55">{formatDate(v.created_at)}</span>
+                          {isRedeem && v.rewards?.name && (
+                            <p className="text-[11px] text-dark/35 mt-0.5 truncate">{v.rewards.name}</p>
+                          )}
+                        </div>
+                        <span className={`font-medium shrink-0 tabular-nums ${isRedeem ? 'text-red-500' : 'text-primary'}`}>
+                          {isRedeem
+                            ? `−${Math.abs(v.points_delta).toLocaleString('es-CL')} pts`
+                            : `+${v.points_delta.toLocaleString('es-CL')} pts`}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
