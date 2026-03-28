@@ -12,12 +12,22 @@ import {
 import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
 
+// Desktop sidebar items
 const NAV_ITEMS = [
   { to: '/dashboard',                    icon: LayoutDashboard, label: 'Dashboard',      end: true  },
   { to: '/dashboard/nueva-compra',       icon: PlusCircle,      label: 'Nueva Compra',   end: false },
   { to: '/dashboard/clientes',           icon: Users,           label: 'Clientes',       end: false },
   { to: '/dashboard/recompensas',        icon: Gift,            label: 'Recompensas',    end: false },
   { to: '/dashboard/configuracion',      icon: Settings,        label: 'Configuración',  end: false },
+]
+
+// Mobile bottom nav — abbreviated labels to fit 5 items
+const BOTTOM_NAV = [
+  { to: '/dashboard',                    icon: LayoutDashboard, label: 'Inicio',    end: true  },
+  { to: '/dashboard/nueva-compra',       icon: PlusCircle,      label: 'Compra',    end: false },
+  { to: '/dashboard/clientes',           icon: Users,           label: 'Clientes',  end: false },
+  { to: '/dashboard/recompensas',        icon: Gift,            label: 'Premios',   end: false },
+  { to: '/dashboard/configuracion',      icon: Settings,        label: 'Config',    end: false },
 ]
 
 export default function DashboardLayout() {
@@ -41,8 +51,39 @@ export default function DashboardLayout() {
   return (
     <div className="flex min-h-screen">
 
-      {/* ── Sidebar ───────────────────────────────────────────── */}
-      <aside className="w-60 shrink-0 fixed inset-y-0 left-0 flex flex-col bg-dark border-r border-white/[0.06] z-40">
+      {/* ─────────────────────────────────────────────────────────────
+          MOBILE — top header (hidden md+)
+      ───────────────────────────────────────────────────────────── */}
+      <header className="md:hidden fixed top-0 inset-x-0 h-14 z-40 bg-dark border-b border-white/[0.06] flex items-center justify-between px-4">
+
+        {/* Logo */}
+        <div className="flex items-center gap-2">
+          <span className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/15 shrink-0">
+            <Star className="w-3 h-3 text-primary fill-primary" />
+          </span>
+          <span
+            className="text-primary text-[20px] leading-none tracking-[0.08em]"
+            style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
+          >
+            Fidelio
+          </span>
+        </div>
+
+        {/* Business name + logout */}
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-1.5 text-white/35 hover:text-red-400 transition-colors duration-150 py-1 pl-2"
+        >
+          <span className="text-[12px] font-medium truncate max-w-[120px]">{businessName}</span>
+          <LogOut className="w-[15px] h-[15px] shrink-0" strokeWidth={1.8} />
+        </button>
+
+      </header>
+
+      {/* ─────────────────────────────────────────────────────────────
+          DESKTOP — sidebar (hidden below md)
+      ───────────────────────────────────────────────────────────── */}
+      <aside className="hidden md:flex w-60 shrink-0 fixed inset-y-0 left-0 flex-col bg-dark border-r border-white/[0.06] z-40">
 
         {/* Logo */}
         <div className="px-5 pt-7 pb-6">
@@ -163,10 +204,48 @@ export default function DashboardLayout() {
         </div>
       </aside>
 
-      {/* ── Main content ──────────────────────────────────────── */}
-      <main className="ml-60 flex-1 min-h-screen bg-cream">
+      {/* ─────────────────────────────────────────────────────────────
+          Main content
+          Mobile:  pt-14 (header) + pb-20 (bottom nav clearance)
+          Desktop: ml-60, no top/bottom offsets
+      ───────────────────────────────────────────────────────────── */}
+      <main className="flex-1 min-h-screen bg-cream pt-14 pb-20 md:pt-0 md:pb-0 md:ml-60">
         <Outlet />
       </main>
+
+      {/* ─────────────────────────────────────────────────────────────
+          MOBILE — bottom nav (hidden md+)
+      ───────────────────────────────────────────────────────────── */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-dark border-t border-white/[0.06]"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        <div className="flex items-stretch">
+          {BOTTOM_NAV.map(({ to, icon: Icon, label, end }) => (
+            <NavLink key={to} to={to} end={end} className="flex-1">
+              {({ isActive }) => (
+                <div
+                  className={[
+                    'flex flex-col items-center justify-center gap-1 py-2.5 transition-colors duration-150 relative',
+                    isActive ? 'text-primary' : 'text-white/30',
+                  ].join(' ')}
+                >
+                  {isActive && (
+                    <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full bg-primary" />
+                  )}
+                  <Icon
+                    className="w-5 h-5 shrink-0"
+                    strokeWidth={isActive ? 2.1 : 1.7}
+                  />
+                  <span className="text-[10px] font-medium leading-none tracking-wide">
+                    {label}
+                  </span>
+                </div>
+              )}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
 
     </div>
   )
