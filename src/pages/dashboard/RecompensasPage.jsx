@@ -223,8 +223,73 @@ export default function RecompensasPage() {
         </button>
       </div>
 
-      {/* Lista */}
-      <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm overflow-hidden">
+      {/* ── Mobile: cards (< md) ──────────────────────────────────────────── */}
+      <div className="md:hidden">
+        {loadingList && (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-black/[0.05] px-4 py-3.5 space-y-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="h-3.5 bg-dark/[0.07] rounded-full w-2/5 animate-pulse" />
+                  <div className="h-6 w-14 bg-dark/[0.06] rounded-lg animate-pulse" />
+                </div>
+                <div className="h-2.5 bg-dark/[0.04] rounded-full w-1/3 animate-pulse" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!loadingList && rewards.length === 0 && (
+          <div className="bg-white rounded-2xl border border-black/[0.05] py-16 text-center">
+            <Gift className="w-10 h-10 text-dark/15 mx-auto mb-3" />
+            <p className="text-dark/40 font-medium text-sm">Sin recompensas aún</p>
+            <p className="text-dark/25 text-xs mt-1">Crea tu primera recompensa para que los clientes puedan canjear sus puntos.</p>
+          </div>
+        )}
+
+        {!loadingList && rewards.length > 0 && (
+          <div className="space-y-2">
+            {rewards.map(r => (
+              <button
+                key={r.id}
+                onClick={() => handleEditReward(r)}
+                className="w-full text-left bg-white rounded-2xl border border-black/[0.05] shadow-sm px-4 py-3.5 active:bg-black/[0.02] transition-colors"
+              >
+                {/* Fila superior: tipo badge + puntos */}
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${TYPE_STYLE[r.type]}`}>
+                    {TYPE_LABEL[r.type]}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-primary font-semibold text-[13px]">
+                    <Star className="w-3 h-3 fill-primary" />
+                    {r.points_required.toLocaleString('es-CL')} pts
+                  </span>
+                </div>
+
+                {/* Nombre */}
+                <p className="text-[14px] font-semibold text-dark leading-tight truncate">{r.name}</p>
+
+                {/* Descripción */}
+                {r.description && (
+                  <p className="text-[12px] text-dark/40 mt-0.5 line-clamp-1">{r.description}</p>
+                )}
+
+                {/* Estado */}
+                <div className="mt-2">
+                  <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-md ${
+                    r.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-dark/[0.05] text-dark/35'
+                  }`}>
+                    {r.is_active ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Desktop: tabla (md+) ────────────────────────────────────────────── */}
+      <div className="hidden md:block bg-white rounded-2xl border border-black/[0.05] shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -240,69 +305,50 @@ export default function RecompensasPage() {
               </tr>
             </thead>
             <tbody>
-              {/* Skeleton */}
               {loadingList && Array.from({ length: 3 }).map((_, i) => (
                 <tr key={i} className="border-b border-black/[0.04]">
                   {[60, 30, 25, 25].map((w, j) => (
                     <td key={j} className="px-5 py-4">
-                      <div
-                        className="h-3 bg-dark/[0.06] rounded-full animate-pulse"
-                        style={{ width: `${w}%` }}
-                      />
+                      <div className="h-3 bg-dark/[0.06] rounded-full animate-pulse" style={{ width: `${w}%` }} />
                     </td>
                   ))}
                 </tr>
               ))}
 
-              {/* Empty state */}
               {!loadingList && rewards.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-5 py-16 text-center">
                     <Gift className="w-10 h-10 text-dark/15 mx-auto mb-3" />
                     <p className="text-dark/40 font-medium text-sm">Sin recompensas aún</p>
-                    <p className="text-dark/25 text-xs mt-1">
-                      Crea tu primera recompensa para que los clientes puedan canjear sus puntos.
-                    </p>
+                    <p className="text-dark/25 text-xs mt-1">Crea tu primera recompensa para que los clientes puedan canjear sus puntos.</p>
                   </td>
                 </tr>
               )}
 
-              {/* Filas */}
               {!loadingList && rewards.map(r => (
                 <tr
                   key={r.id}
                   onClick={() => handleEditReward(r)}
                   className="cursor-pointer hover:bg-black/[0.02] transition-colors border-b border-black/[0.04] last:border-0"
                 >
-                  {/* Recompensa */}
                   <td className="px-5 py-4">
                     <p className="text-[14px] font-semibold text-dark leading-tight">{r.name}</p>
-                    {r.description && (
-                      <p className="text-[12px] text-dark/40 mt-0.5 line-clamp-1">{r.description}</p>
-                    )}
+                    {r.description && <p className="text-[12px] text-dark/40 mt-0.5 line-clamp-1">{r.description}</p>}
                   </td>
-
-                  {/* Tipo */}
                   <td className="px-5 py-4">
                     <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-md ${TYPE_STYLE[r.type]}`}>
                       {TYPE_LABEL[r.type]}
                     </span>
                   </td>
-
-                  {/* Puntos */}
                   <td className="px-5 py-4 text-right">
                     <span className="inline-flex items-center gap-1 text-primary font-semibold text-[14px]">
                       <Star className="w-3.5 h-3.5 fill-primary" />
                       {r.points_required.toLocaleString('es-CL')}
                     </span>
                   </td>
-
-                  {/* Estado */}
                   <td className="px-5 py-4 text-center">
                     <span className={`inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-md ${
-                      r.is_active
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-dark/[0.05] text-dark/40'
+                      r.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-dark/[0.05] text-dark/40'
                     }`}>
                       {r.is_active ? 'Activo' : 'Inactivo'}
                     </span>
