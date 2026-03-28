@@ -176,7 +176,7 @@ export default function ConfiguracionPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-8 lg:p-10 max-w-2xl pb-24 md:pb-8">
+    <div className="p-8 lg:p-10 max-w-5xl pb-24 md:pb-8">
 
       {/* Header */}
       <div className="mb-8">
@@ -191,8 +191,10 @@ export default function ConfiguracionPage() {
         </p>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+
       {/* ── Sección 1 — Tu negocio ─────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm p-6 mb-6 space-y-5">
+      <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm p-6 space-y-5">
 
         <div>
           <h2 className="text-[15px] font-semibold text-dark">Tu negocio</h2>
@@ -415,6 +417,8 @@ export default function ConfiguracionPage() {
           Guardar cambios
         </button>
       </div>
+
+      </div>{/* end grid */}
 
     </div>
   )

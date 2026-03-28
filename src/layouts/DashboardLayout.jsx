@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   PlusCircle,
@@ -57,7 +57,7 @@ export default function DashboardLayout() {
       <header className="md:hidden fixed top-0 inset-x-0 h-14 z-40 bg-dark border-b border-white/[0.06] flex items-center justify-between px-4">
 
         {/* Logo */}
-        <div className="flex items-center gap-2">
+        <Link to="/dashboard" className="flex items-center gap-2">
           <span className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/15 shrink-0">
             <Star className="w-3 h-3 text-primary fill-primary" />
           </span>
@@ -67,7 +67,7 @@ export default function DashboardLayout() {
           >
             Fidelio
           </span>
-        </div>
+        </Link>
 
         {/* Business name + logout */}
         <button
@@ -87,7 +87,7 @@ export default function DashboardLayout() {
 
         {/* Logo */}
         <div className="px-5 pt-7 pb-6">
-          <div className="flex items-center gap-2.5">
+          <Link to="/dashboard" className="flex items-center gap-2.5">
             <span className="flex items-center justify-center w-7 h-7 rounded-md bg-primary/15 shrink-0">
               <Star className="w-3.5 h-3.5 text-primary fill-primary" />
             </span>
@@ -97,7 +97,7 @@ export default function DashboardLayout() {
             >
               Fidelio
             </span>
-          </div>
+          </Link>
         </div>
 
         {/* Divider */}
