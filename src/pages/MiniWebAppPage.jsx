@@ -33,7 +33,7 @@ export default function MiniWebAppPage() {
   useEffect(() => {
     supabase
       .from('businesses')
-      .select('id, name, slug, program_name, points_per_clp, welcome_points, primary_color')
+      .select('id, name, slug, program_name, points_per_clp, welcome_points, primary_color, logo_url')
       .eq('slug', slug)
       .single()
       .then(({ data, error }) => {
@@ -159,6 +159,14 @@ export default function MiniWebAppPage() {
           <>
             {/* Logo / header negocio */}
             <div className="pt-16 pb-10 text-center">
+              {business.logo_url && (
+                <img
+                  src={business.logo_url}
+                  alt={business.name}
+                  className="w-16 h-16 rounded-full object-cover mx-auto mb-4 border-2"
+                  style={{ borderColor: `${accent}40` }}
+                />
+              )}
               <div
                 className="text-3xl font-semibold mb-1"
                 style={{ fontFamily: 'var(--font-display)', color: accent, fontWeight: 600 }}
@@ -273,17 +281,27 @@ export default function MiniWebAppPage() {
         {view === 'panel' && customer && (
           <>
             {/* Header */}
-            <div className="pt-10 pb-6 flex items-center justify-between">
-              <div>
-                <p className="text-white/40 text-xs font-medium uppercase tracking-wider mb-0.5">
-                  {business.program_name}
-                </p>
-                <p className="text-white text-lg font-semibold">
-                  Hola, {customer.name ?? 'cliente'} 👋
-                </p>
+            <div className="pt-10 pb-6 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                {business.logo_url && (
+                  <img
+                    src={business.logo_url}
+                    alt={business.name}
+                    className="w-10 h-10 rounded-full object-cover shrink-0 border"
+                    style={{ borderColor: `${accent}30` }}
+                  />
+                )}
+                <div className="min-w-0">
+                  <p className="text-white/40 text-xs font-medium uppercase tracking-wider mb-0.5 truncate">
+                    {business.program_name}
+                  </p>
+                  <p className="text-white text-lg font-semibold">
+                    Hola, {customer.name ?? 'cliente'} 👋
+                  </p>
+                </div>
               </div>
               <div
-                className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg"
+                className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg shrink-0"
                 style={{ background: `${accent}20`, color: accent }}
               >
                 {customer.visits_count} visita{customer.visits_count !== 1 ? 's' : ''}
