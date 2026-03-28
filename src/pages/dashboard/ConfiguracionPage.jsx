@@ -176,7 +176,7 @@ export default function ConfiguracionPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-8 lg:p-10 max-w-2xl">
+    <div className="p-8 lg:p-10 max-w-2xl pb-24 md:pb-8">
 
       {/* Header */}
       <div className="mb-8">

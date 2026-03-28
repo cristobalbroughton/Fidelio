@@ -163,7 +163,7 @@ export default function HomePage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-8 lg:p-10 max-w-6xl">
+    <div className="p-8 lg:p-10 max-w-6xl pb-24 md:pb-8">
 
       {/* Header */}
       <div className="mb-8">

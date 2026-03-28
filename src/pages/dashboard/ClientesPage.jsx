@@ -162,7 +162,7 @@ export default function ClientesPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-8 lg:p-10 max-w-6xl">
+    <div className="p-8 lg:p-10 max-w-6xl pb-24 md:pb-8">
 
       {/* Encabezado */}
       <div className="flex items-end justify-between mb-6">
@@ -193,8 +193,75 @@ export default function ClientesPage() {
         />
       </div>
 
-      {/* Tabla de clientes */}
-      <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm overflow-hidden">
+      {/* ── Mobile: lista de cards (< md) ─────────────────────────────────── */}
+      <div className="md:hidden">
+        {/* Skeleton */}
+        {loadingList && (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-black/[0.05] px-4 py-3.5 flex items-center justify-between gap-3">
+                <div className="space-y-2 flex-1">
+                  <div className="h-3.5 bg-dark/[0.07] rounded-full w-2/5 animate-pulse" />
+                  <div className="h-2.5 bg-dark/[0.04] rounded-full w-1/3 animate-pulse" />
+                </div>
+                <div className="h-7 w-16 bg-dark/[0.06] rounded-lg animate-pulse" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loadingList && filtered.length === 0 && (
+          <div className="bg-white rounded-2xl border border-black/[0.05] py-16 text-center">
+            {search ? (
+              <>
+                <Search className="w-8 h-8 text-dark/15 mx-auto mb-3" />
+                <p className="text-dark/40 text-sm">Sin resultados para &ldquo;{search}&rdquo;</p>
+              </>
+            ) : (
+              <>
+                <Users className="w-10 h-10 text-dark/15 mx-auto mb-3" />
+                <p className="text-dark/40 font-medium text-sm">Sin clientes aún</p>
+                <p className="text-dark/25 text-xs mt-1">Los clientes aparecerán al registrar su primera compra.</p>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Cards */}
+        {!loadingList && filtered.length > 0 && (
+          <div className="space-y-2">
+            {filtered.map(c => (
+              <button
+                key={c.id}
+                onClick={() => handleOpenDrawer(c)}
+                className="w-full text-left bg-white rounded-2xl border border-black/[0.05] shadow-sm px-4 py-3.5 flex items-center justify-between gap-3 active:bg-black/[0.02] transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-semibold text-dark leading-tight truncate">
+                    {c.name ?? c.phone}
+                  </p>
+                  <p className="text-[12px] text-dark/40 mt-0.5 truncate">
+                    {c.name ? c.phone : null}
+                  </p>
+                  {c.last_visit_at && (
+                    <p className="text-[11px] text-dark/30 mt-1">
+                      Última visita {formatDateShort(c.last_visit_at)}
+                    </p>
+                  )}
+                </div>
+                <span className="shrink-0 inline-flex items-center gap-1 bg-primary/[0.08] text-primary text-[13px] font-semibold px-2.5 py-1.5 rounded-lg">
+                  <Star className="w-3 h-3 fill-primary" />
+                  {c.points_balance.toLocaleString('es-CL')}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Desktop: tabla (md+) ────────────────────────────────────────────── */}
+      <div className="hidden md:block bg-white rounded-2xl border border-black/[0.05] shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -210,21 +277,16 @@ export default function ClientesPage() {
               </tr>
             </thead>
             <tbody>
-              {/* Skeleton */}
               {loadingList && Array.from({ length: 3 }).map((_, i) => (
                 <tr key={i} className="border-b border-black/[0.04]">
                   {[55, 75, 35, 50, 25, 45].map((w, j) => (
                     <td key={j} className="px-5 py-4">
-                      <div
-                        className="h-3 bg-dark/[0.06] rounded-full animate-pulse"
-                        style={{ width: `${w}%` }}
-                      />
+                      <div className="h-3 bg-dark/[0.06] rounded-full animate-pulse" style={{ width: `${w}%` }} />
                     </td>
                   ))}
                 </tr>
               ))}
 
-              {/* Empty state */}
               {!loadingList && filtered.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-5 py-16 text-center">
@@ -237,58 +299,38 @@ export default function ClientesPage() {
                       <>
                         <Users className="w-10 h-10 text-dark/15 mx-auto mb-3" />
                         <p className="text-dark/40 font-medium text-sm">Sin clientes aún</p>
-                        <p className="text-dark/25 text-xs mt-1">
-                          Los clientes aparecerán aquí al registrar su primera compra.
-                        </p>
+                        <p className="text-dark/25 text-xs mt-1">Los clientes aparecerán aquí al registrar su primera compra.</p>
                       </>
                     )}
                   </td>
                 </tr>
               )}
 
-              {/* Filas */}
               {!loadingList && filtered.map(c => (
                 <tr
                   key={c.id}
                   onClick={() => handleOpenDrawer(c)}
                   className="cursor-pointer hover:bg-black/[0.02] transition-colors border-b border-black/[0.04] last:border-0"
                 >
-                  {/* Cliente */}
                   <td className="px-5 py-4">
-                    <p className="text-[14px] font-semibold text-dark leading-tight">
-                      {c.name ?? c.phone}
-                    </p>
-                    {c.name && (
-                      <p className="text-[12px] text-dark/35 mt-0.5">{c.phone}</p>
-                    )}
+                    <p className="text-[14px] font-semibold text-dark leading-tight">{c.name ?? c.phone}</p>
+                    {c.name && <p className="text-[12px] text-dark/35 mt-0.5">{c.phone}</p>}
                   </td>
-
-                  {/* Teléfono */}
                   <td className="px-5 py-4">
                     <span className="text-sm text-dark/45">{c.phone}</span>
                   </td>
-
-                  {/* Puntos */}
                   <td className="px-5 py-4 text-right">
                     <span className="inline-flex items-center gap-1 text-primary font-semibold text-[14px]">
                       <Star className="w-3.5 h-3.5 fill-primary" />
                       {c.points_balance.toLocaleString('es-CL')}
                     </span>
                   </td>
-
-                  {/* Total gastado */}
                   <td className="px-5 py-4 text-right">
-                    <span className="text-[14px] text-dark font-medium">
-                      ${formatCLP(spendMap[c.id] ?? 0)}
-                    </span>
+                    <span className="text-[14px] text-dark font-medium">${formatCLP(spendMap[c.id] ?? 0)}</span>
                   </td>
-
-                  {/* Visitas */}
                   <td className="px-5 py-4 text-center">
                     <span className="text-[14px] text-dark/70">{c.visits_count}</span>
                   </td>
-
-                  {/* Última visita */}
                   <td className="px-5 py-4 text-right">
                     <span className="text-sm text-dark/45 whitespace-nowrap">
                       {c.last_visit_at ? formatDateShort(c.last_visit_at) : '—'}

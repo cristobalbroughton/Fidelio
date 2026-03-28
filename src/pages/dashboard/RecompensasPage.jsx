@@ -197,7 +197,7 @@ export default function RecompensasPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-8 lg:p-10 max-w-4xl">
+    <div className="p-8 lg:p-10 max-w-4xl pb-24 md:pb-8">
 
       {/* Encabezado */}
       <div className="flex items-end justify-between mb-6">
