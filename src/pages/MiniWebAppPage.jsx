@@ -15,6 +15,12 @@ function normalizePhone(raw) {
   return `+${digits}`
 }
 
+function formatDateLong(iso) {
+  return new Date(iso).toLocaleDateString('es-CL', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  })
+}
+
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export default function MiniWebAppPage() {
@@ -29,6 +35,11 @@ export default function MiniWebAppPage() {
   const [customer, setCustomer]         = useState(null)
   const [loading, setLoading]           = useState(false)
   const [limitReached, setLimitReached] = useState(false)
+  const [nameError, setNameError]       = useState('')
+  const [showAllRewards, setShowAllRewards] = useState(false)
+  const [showHistory, setShowHistory]   = useState(false)
+  const [history, setHistory]           = useState([])
+  const [historyLoaded, setHistoryLoaded] = useState(false)
 
   // ── Carga negocio ───────────────────────────────────────────────────────────
 
@@ -72,6 +83,11 @@ export default function MiniWebAppPage() {
   }
 
   const handleRegister = async () => {
+    if (!name.trim()) {
+      setNameError('El nombre es requerido')
+      return
+    }
+    setNameError('')
     const normalized = normalizePhone(phone)
     setLoading(true)
     try {
@@ -120,6 +136,20 @@ export default function MiniWebAppPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleToggleHistory = async () => {
+    if (!showHistory && !historyLoaded) {
+      const { data } = await supabase
+        .from('transactions')
+        .select('type, points_delta, created_at, rewards(name)')
+        .eq('customer_id', customer.id)
+        .order('created_at', { ascending: false })
+        .limit(5)
+      setHistory(data ?? [])
+      setHistoryLoaded(true)
+    }
+    setShowHistory(h => !h)
   }
 
   // ── Theming dinámico ────────────────────────────────────────────────────────
@@ -191,9 +221,9 @@ export default function MiniWebAppPage() {
                 className="text-3xl font-semibold mb-1"
                 style={{ fontFamily: 'var(--font-display)', color: accent, fontWeight: 600 }}
               >
-                {business.name}
+                {business.program_name}
               </div>
-              <p className="text-white/40 text-sm">{business.program_name}</p>
+              <p className="text-white/40 text-sm">{business.name}</p>
             </div>
 
             <div className="flex-1 flex flex-col justify-center">
@@ -278,16 +308,19 @@ export default function MiniWebAppPage() {
                 <div className="space-y-3">
                   <div>
                     <p className="text-white/40 text-[12px] font-medium mb-1.5 uppercase tracking-wider">
-                      Tu nombre <span className="normal-case">(opcional)</span>
+                      Tu nombre
                     </p>
                     <input
                       type="text"
                       value={name}
-                      onChange={e => setName(e.target.value)}
-                      placeholder="¿Cómo te llamamos?"
+                      onChange={e => { setName(e.target.value); if (nameError) setNameError('') }}
+                      placeholder="Tu nombre"
                       className={INPUT_DARK}
                       autoFocus
                     />
+                    {nameError && (
+                      <p className="text-red-400 text-[12px] mt-1.5">{nameError}</p>
+                    )}
                   </div>
                   <button
                     onClick={handleRegister}
@@ -322,8 +355,9 @@ export default function MiniWebAppPage() {
                   <p className="text-white/40 text-xs font-medium uppercase tracking-wider mb-0.5 truncate">
                     {business.program_name}
                   </p>
+                  <p className="text-white/30 text-[11px] mb-0.5 truncate">{business.name}</p>
                   <p className="text-white text-lg font-semibold">
-                    Hola, {customer.name ?? 'cliente'} 👋
+                    {customer.name ? `Hola, ${customer.name}` : 'Hola!'} 👋
                   </p>
                 </div>
               </div>
@@ -391,7 +425,7 @@ export default function MiniWebAppPage() {
                   Recompensas
                 </p>
                 <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl overflow-hidden divide-y divide-white/[0.05]">
-                  {rewards.map(r => {
+                  {(showAllRewards ? rewards : rewards.slice(0, 3)).map(r => {
                     const unlocked = customer.points_balance >= r.points_required
                     const missing = r.points_required - customer.points_balance
                     return (
@@ -428,8 +462,57 @@ export default function MiniWebAppPage() {
                     )
                   })}
                 </div>
+                {rewards.length > 3 && (
+                  <button
+                    onClick={() => setShowAllRewards(v => !v)}
+                    className="mt-2 w-full text-center text-[12px] text-white/35 hover:text-white/55 transition-colors py-1"
+                  >
+                    {showAllRewards
+                      ? 'Ver menos'
+                      : `Ver todas las recompensas (${rewards.length})`}
+                  </button>
+                )}
               </div>
             )}
+
+            {/* Historial */}
+            <div className="mb-5">
+              <button
+                onClick={handleToggleHistory}
+                className="flex items-center gap-1 text-white/35 hover:text-white/55 text-[12px] font-medium transition-colors mb-3"
+              >
+                {showHistory ? 'Ver menos' : 'Ver actividad reciente →'}
+              </button>
+              {showHistory && (
+                <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl overflow-hidden divide-y divide-white/[0.05]">
+                  {history.length === 0 ? (
+                    <p className="text-white/30 text-[13px] text-center py-5">Sin actividad</p>
+                  ) : (
+                    history.map((tx, i) => {
+                      const isRedeem = tx.type === 'redeem'
+                      return (
+                        <div key={i} className="flex items-start justify-between gap-3 px-4 py-3.5">
+                          <div className="min-w-0">
+                            <p className="text-white/50 text-[12px]">{formatDateLong(tx.created_at)}</p>
+                            {isRedeem && tx.rewards?.name && (
+                              <p className="text-white/30 text-[11px] mt-0.5 truncate">{tx.rewards.name}</p>
+                            )}
+                          </div>
+                          <span
+                            className={`text-[13px] font-semibold shrink-0 tabular-nums ${isRedeem ? 'text-red-400' : ''}`}
+                            style={!isRedeem ? { color: accent } : {}}
+                          >
+                            {isRedeem
+                              ? `−${Math.abs(tx.points_delta).toLocaleString('es-CL')} pts`
+                              : `+${tx.points_delta.toLocaleString('es-CL')} pts`}
+                          </span>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* QR personal */}
             <div className="mb-5">
