@@ -245,7 +245,7 @@ function HowItWorks() {
                 <div key={step.num} className="flex flex-col gap-4">
                   <div className="flex items-start gap-4">
                     <span
-                      className="text-primary/20 leading-none shrink-0"
+                      className="text-primary/40 leading-none shrink-0"
                       style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 48 }}
                     >
                       {step.num}

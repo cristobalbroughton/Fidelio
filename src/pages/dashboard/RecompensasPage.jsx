@@ -3,6 +3,10 @@ import { Loader2, Plus, Gift, Star, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import {
+  PLAN_LIMITS, WA_UPGRADE_LINK,
+  getEffectivePlan, getPlanLimits, getUpgradeMessage,
+} from '../../lib/planLimits'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -56,7 +60,7 @@ export default function RecompensasPage() {
     if (!user?.id) return
     supabase
       .from('businesses')
-      .select('id, name')
+      .select('id, name, plan, pro_expires_at')
       .eq('owner_id', user.id)
       .single()
       .then(({ data, error }) => {
@@ -200,28 +204,56 @@ export default function RecompensasPage() {
     <div className="p-8 lg:p-10 max-w-4xl pb-24 md:pb-8">
 
       {/* Encabezado */}
-      <div className="flex items-end justify-between mb-6">
-        <div>
-          <h1
-            className="text-[26px] font-semibold text-dark tracking-tight"
-            style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
-          >
-            Recompensas
-          </h1>
-          <p className="text-dark/45 text-sm mt-1">
-            {rewards.length > 0
-              ? `${rewards.length} recompensa${rewards.length !== 1 ? 's' : ''} configurada${rewards.length !== 1 ? 's' : ''}`
-              : 'Configura las recompensas de tu programa'}
-          </p>
-        </div>
-        <button
-          onClick={handleNewReward}
-          className="flex items-center gap-2 bg-primary text-dark font-semibold text-sm px-4 py-2.5 rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Nueva recompensa
-        </button>
-      </div>
+      {(() => {
+        const effective     = business ? getEffectivePlan(business) : { plan: 'free', isGrace: false }
+        const limits        = getPlanLimits(effective.plan)
+        const activeCount   = rewards.filter(r => r.is_active).length
+        const atRewardLimit = limits.maxRewards !== Infinity && activeCount >= limits.maxRewards
+        return (
+          <div className="flex items-end justify-between mb-6">
+            <div>
+              <h1
+                className="text-[26px] font-semibold text-dark tracking-tight"
+                style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
+              >
+                Recompensas
+              </h1>
+              <p className="text-dark/45 text-sm mt-1">
+                {rewards.length > 0
+                  ? `${rewards.length} recompensa${rewards.length !== 1 ? 's' : ''} configurada${rewards.length !== 1 ? 's' : ''}`
+                  : 'Configura las recompensas de tu programa'}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <button
+                onClick={atRewardLimit ? undefined : handleNewReward}
+                disabled={atRewardLimit}
+                className={`flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors ${
+                  atRewardLimit
+                    ? 'bg-dark/[0.06] text-dark/30 cursor-not-allowed'
+                    : 'bg-primary text-dark hover:bg-primary/90'
+                }`}
+              >
+                <Plus className="w-4 h-4" />
+                Nueva recompensa
+              </button>
+              {atRewardLimit && (
+                <p className="text-xs text-dark/45 text-right max-w-[220px]">
+                  Tu plan {PLAN_LIMITS[effective.plan].label} incluye hasta {limits.maxRewards} recompensas activas.{' '}
+                  <a
+                    href={WA_UPGRADE_LINK}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline"
+                  >
+                    {getUpgradeMessage(effective.plan)} →
+                  </a>
+                </p>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Mobile: cards (< md) ──────────────────────────────────────────── */}
       <div className="md:hidden">

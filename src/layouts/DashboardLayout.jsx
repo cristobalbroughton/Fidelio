@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -8,9 +9,51 @@ import {
   Star,
   LogOut,
   ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
+import {
+  WA_UPGRADE_LINK,
+  getEffectivePlan, getPlanLimits, getUpgradeMessage,
+} from '../lib/planLimits'
+
+// ── Plan banner ───────────────────────────────────────────────────────────────
+
+function PlanBanner({ status, className = '' }) {
+  if (!status) return null
+  const { effective, customerCount, maxCustomers } = status
+  const { plan, isGrace, daysLeft } = effective
+  const atLimit = maxCustomers !== Infinity && customerCount >= maxCustomers
+  const near80  = !atLimit && maxCustomers !== Infinity && customerCount >= maxCustomers * 0.8
+
+  if (!isGrace && !atLimit && !near80) return null
+
+  let bg, textCls, msg
+  if (isGrace) {
+    bg = 'bg-red-500/[0.15] border-red-500/30'; textCls = 'text-red-400'
+    msg = `Tu plan venció. ${daysLeft} día${daysLeft !== 1 ? 's' : ''} para renovar.`
+  } else if (atLimit) {
+    bg = 'bg-orange-500/[0.12] border-orange-500/25'; textCls = 'text-orange-400'
+    msg = `Límite alcanzado. ${getUpgradeMessage(plan)} para crecer.`
+  } else {
+    bg = 'bg-yellow-500/[0.10] border-yellow-500/20'; textCls = 'text-yellow-500'
+    msg = `${customerCount}/${maxCustomers} clientes — acercándote al límite.`
+  }
+
+  return (
+    <a
+      href={WA_UPGRADE_LINK}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`flex items-start gap-2 px-3 py-2 rounded-lg border text-[11px] leading-snug hover:opacity-80 transition-opacity ${bg} ${textCls} ${className}`}
+    >
+      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" strokeWidth={2} />
+      <span>{msg} →</span>
+    </a>
+  )
+}
 
 // Desktop sidebar items
 const NAV_ITEMS = [
@@ -38,6 +81,27 @@ export default function DashboardLayout() {
     user?.user_metadata?.business_name ??
     user?.email?.split('@')[0] ??
     'Mi Negocio'
+
+  const [planStatus, setPlanStatus] = useState(null)
+
+  useEffect(() => {
+    if (!user?.id) return
+    supabase
+      .from('businesses')
+      .select('id, plan, pro_expires_at')
+      .eq('owner_id', user.id)
+      .single()
+      .then(async ({ data: biz, error }) => {
+        if (error || !biz) return
+        const { count } = await supabase
+          .from('loyalty_customers')
+          .select('*', { count: 'exact', head: true })
+          .eq('business_id', biz.id)
+        const effective = getEffectivePlan(biz)
+        const { maxCustomers } = getPlanLimits(effective.plan)
+        setPlanStatus({ effective, customerCount: count ?? 0, maxCustomers })
+      })
+  }, [user?.id])
 
   const handleLogout = async () => {
     try {
@@ -102,6 +166,11 @@ export default function DashboardLayout() {
 
         {/* Divider */}
         <div className="mx-5 h-px bg-white/[0.06] mb-4" />
+
+        {/* Plan banner */}
+        <div className="px-2.5 mb-2">
+          <PlanBanner status={planStatus} />
+        </div>
 
         {/* Navigation */}
         <nav className="flex-1 px-2.5 space-y-0.5 overflow-y-auto">
@@ -210,6 +279,9 @@ export default function DashboardLayout() {
           Desktop: ml-60, no top/bottom offsets
       ───────────────────────────────────────────────────────────── */}
       <main className="flex-1 min-h-screen bg-cream pt-14 pb-20 md:pt-0 md:pb-0 md:ml-60">
+        <div className="md:hidden px-4 pt-3">
+          <PlanBanner status={planStatus} />
+        </div>
         <Outlet />
       </main>
 

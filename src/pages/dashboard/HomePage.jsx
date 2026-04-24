@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Users, Star, ShoppingBag, TrendingUp, Loader2 } from 'lucide-react'
+import { Users, Star, ShoppingBag, TrendingUp, Loader2, AlertTriangle } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -7,6 +7,7 @@ import {
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { WA_UPGRADE_LINK } from '../../lib/planLimits'
 
 // ── Helpers de datos ──────────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ export default function HomePage() {
     if (!user?.id) return
     supabase
       .from('businesses')
-      .select('id, name')
+      .select('id, name, failed_registrations')
       .eq('owner_id', user.id)
       .single()
       .then(({ data, error }) => {
@@ -204,6 +205,35 @@ export default function HomePage() {
           </div>
         ))}
       </div>
+
+      {/* Tarjeta intentos fallidos (solo visible si > 0) */}
+      {(business?.failed_registrations ?? 0) > 0 && (
+        <div className="bg-white rounded-2xl p-6 border border-orange-200/60 shadow-sm flex items-start gap-4 mb-8">
+          <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-orange-50 shrink-0">
+            <AlertTriangle className="w-[17px] h-[17px] text-orange-400" strokeWidth={1.9} />
+          </span>
+          <div>
+            <p
+              className="text-[32px] leading-none text-orange-500 tabular-nums mb-1"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
+            >
+              {business.failed_registrations.toLocaleString('es-CL')}
+            </p>
+            <p className="text-[13px] text-dark/55">
+              persona{business.failed_registrations !== 1 ? 's' : ''}{' '}
+              no pud{business.failed_registrations !== 1 ? 'ieron' : 'o'} unirse por límite de plan
+            </p>
+            <a
+              href={WA_UPGRADE_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[12px] text-primary underline mt-1 inline-block"
+            >
+              Mejorar plan →
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">

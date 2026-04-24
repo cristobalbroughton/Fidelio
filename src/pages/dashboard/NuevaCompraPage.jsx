@@ -3,6 +3,10 @@ import { Loader2, Search, CheckCircle2, Star, X, QrCode } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import {
+  PLAN_LIMITS, WA_UPGRADE_LINK,
+  getEffectivePlan, getPlanLimits, getUpgradeMessage,
+} from '../../lib/planLimits'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -71,6 +75,9 @@ export default function NuevaCompraPage() {
   // QR scanner
   const [qrOpen, setQrOpen] = useState(false)
 
+  // Plan limit
+  const [limitError, setLimitError] = useState(null)
+
   // Derived
   const amountRaw = Number(amount.replace(/\./g, ''))
   const pointsPreview =
@@ -82,7 +89,7 @@ export default function NuevaCompraPage() {
     if (!user?.id) return
     supabase
       .from('businesses')
-      .select('id, name, points_per_clp, welcome_points')
+      .select('id, name, points_per_clp, welcome_points, plan, pro_expires_at')
       .eq('owner_id', user.id)
       .single()
       .then(({ data, error }) => {
@@ -143,6 +150,28 @@ export default function NuevaCompraPage() {
     if (!business) return
     setLoading(true)
     try {
+      // Check plan limits
+      const effective = getEffectivePlan(business)
+      if (!effective.isGrace) {
+        const limits = getPlanLimits(effective.plan)
+        if (limits.maxCustomers !== Infinity) {
+          const { count } = await supabase
+            .from('loyalty_customers')
+            .select('*', { count: 'exact', head: true })
+            .eq('business_id', business.id)
+          if (count >= limits.maxCustomers) {
+            const upgradeMsg = getUpgradeMessage(effective.plan)
+            setLimitError(
+              `Has alcanzado el límite de ${limits.maxCustomers} clientes en tu plan ` +
+              `${PLAN_LIMITS[effective.plan].label}. ${upgradeMsg} para continuar.`
+            )
+            setLoading(false)
+            return
+          }
+        }
+      }
+      setLimitError(null)
+
       const normalizedPhone = normalizePhone(phone)
 
       const { data: newCustomer, error: custError } = await supabase
@@ -434,6 +463,20 @@ export default function NuevaCompraPage() {
               </span>{' '}
               de bienvenida.
             </p>
+
+            {limitError && (
+              <div className="rounded-xl bg-orange-50 border border-orange-200 px-4 py-3 text-sm text-orange-800">
+                <p>{limitError}</p>
+                <a
+                  href={WA_UPGRADE_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold underline mt-1 inline-block"
+                >
+                  Contactar para mejorar →
+                </a>
+              </div>
+            )}
 
             <button
               onClick={handleRegisterNew}

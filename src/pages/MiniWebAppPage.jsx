@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { Loader2, Star, CheckCircle2, Lock, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import { getEffectivePlan, getPlanLimits } from '../lib/planLimits'
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -25,15 +26,16 @@ export default function MiniWebAppPage() {
 
   const [phone, setPhone]       = useState('')
   const [name, setName]         = useState('')
-  const [customer, setCustomer] = useState(null)
-  const [loading, setLoading]   = useState(false)
+  const [customer, setCustomer]         = useState(null)
+  const [loading, setLoading]           = useState(false)
+  const [limitReached, setLimitReached] = useState(false)
 
   // ── Carga negocio ───────────────────────────────────────────────────────────
 
   useEffect(() => {
     supabase
       .from('businesses')
-      .select('id, name, slug, program_name, points_per_clp, welcome_points, primary_color, logo_url')
+      .select('id, name, slug, program_name, points_per_clp, welcome_points, primary_color, logo_url, plan, pro_expires_at')
       .eq('slug', slug)
       .single()
       .then(({ data, error }) => {
@@ -73,6 +75,24 @@ export default function MiniWebAppPage() {
     const normalized = normalizePhone(phone)
     setLoading(true)
     try {
+      // Check plan limits (no blocker during grace period)
+      const effective = getEffectivePlan(business)
+      if (!effective.isGrace) {
+        const limits = getPlanLimits(effective.plan)
+        if (limits.maxCustomers !== Infinity) {
+          const { count } = await supabase
+            .from('loyalty_customers')
+            .select('*', { count: 'exact', head: true })
+            .eq('business_id', business.id)
+          if (count >= limits.maxCustomers) {
+            await supabase.rpc('increment_failed_registrations', { p_business_id: business.id })
+            setLimitReached(true)
+            setLoading(false)
+            return
+          }
+        }
+      }
+
       const { data: newCustomer, error } = await supabase
         .from('loyalty_customers')
         .insert({
@@ -249,30 +269,37 @@ export default function MiniWebAppPage() {
                 </span>
               </div>
 
-              <div className="space-y-3">
-                <div>
-                  <p className="text-white/40 text-[12px] font-medium mb-1.5 uppercase tracking-wider">
-                    Tu nombre <span className="normal-case">(opcional)</span>
-                  </p>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="¿Cómo te llamamos?"
-                    className={INPUT_DARK}
-                    autoFocus
-                  />
+              {limitReached ? (
+                <div className="text-center text-white/55 text-sm px-2 py-6 leading-relaxed">
+                  En este momento el programa no está aceptando nuevos miembros.
+                  Consulta directamente con el negocio.
                 </div>
-                <button
-                  onClick={handleRegister}
-                  disabled={loading}
-                  className="w-full font-semibold py-3.5 rounded-xl transition-opacity disabled:opacity-40 flex items-center justify-center gap-2 text-[15px]"
-                  style={{ background: accent, color: '#0f0f0f' }}
-                >
-                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {loading ? 'Registrando…' : 'Unirse al programa'}
-                </button>
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-white/40 text-[12px] font-medium mb-1.5 uppercase tracking-wider">
+                      Tu nombre <span className="normal-case">(opcional)</span>
+                    </p>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      placeholder="¿Cómo te llamamos?"
+                      className={INPUT_DARK}
+                      autoFocus
+                    />
+                  </div>
+                  <button
+                    onClick={handleRegister}
+                    disabled={loading}
+                    className="w-full font-semibold py-3.5 rounded-xl transition-opacity disabled:opacity-40 flex items-center justify-center gap-2 text-[15px]"
+                    style={{ background: accent, color: '#0f0f0f' }}
+                  >
+                    {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {loading ? 'Registrando…' : 'Unirse al programa'}
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
