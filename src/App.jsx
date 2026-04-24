@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 
@@ -17,6 +17,7 @@ import RecompensasPage from './pages/dashboard/RecompensasPage'
 import MiniWebAppPage from './pages/MiniWebAppPage'
 import AdminPage from './pages/AdminPage'
 import ConfiguracionPage from './pages/dashboard/ConfiguracionPage'
+import LandingPage from './pages/LandingPage'
 
 // ── Placeholders ──────────────────────────────────────────────────────────────
 
@@ -57,8 +58,8 @@ export default function App() {
         <AuthProvider>
           <Routes>
 
-            {/* Raíz → dashboard */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            {/* Raíz → landing (redirige a /dashboard si hay sesión) */}
+            <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
 
             {/* Rutas públicas (redirigen si ya hay sesión) */}
             <Route path="/login"    element={<PublicRoute><LoginPage /></PublicRoute>} />

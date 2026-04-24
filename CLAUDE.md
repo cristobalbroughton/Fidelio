@@ -30,10 +30,17 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - Row Level Security (RLS) habilitado — cada `business` solo ve sus propios datos
 
 ## Schema Supabase
-- `businesses`: owner_id, name, slug, category, description, program_name, points_per_clp, welcome_points, primary_color (hex), plan (text), last_activity_at (timestamp)
+- `businesses`: owner_id, name, slug, category, description, program_name, points_per_clp, welcome_points, primary_color (hex), logo_url (text, nullable), plan (text), last_activity_at (timestamp)
 - `loyalty_customers`: business_id, phone, name, points_balance, visits_count, last_visit_at
-- `transactions`: business_id, customer_id, type (welcome|earn|redeem), points_delta, amount_clp, created_at
+- `transactions`: business_id, customer_id, type (welcome|earn|redeem), points_delta, amount_clp, created_at, reward_id (uuid nullable FK→rewards)
 - `rewards`: business_id, name, description (nullable), points_required, type (product|discount|experience), is_active (boolean, default true)
+
+## Migraciones pendientes / ya aplicadas
+```sql
+ALTER TABLE transactions ADD COLUMN reward_id uuid REFERENCES rewards(id);
+ALTER TABLE businesses ADD COLUMN logo_url text;
+-- Storage: bucket 'logos' público; policy INSERT auth.uid() IS NOT NULL
+```
 
 ## Comandos útiles
 - `npm run dev` — servidor local Vite
@@ -80,3 +87,36 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - Al encontrar cliente por QR: buscar en `loyalty_customers` por `id` + `business_id` con `.maybeSingle()` — nunca `.single()` (PGRST116 si no hay resultado)
 - Vista `purchase` usa `customer.phone` directamente, NO `normalizePhone(phone)` — el estado `phone` puede estar vacío si se llegó por QR
 - `handleCredit` actualiza `businesses.last_activity_at = now()` después de cada compra exitosa
+
+## ConfiguracionPage (`/dashboard/configuracion`)
+- Dos secciones independientes con botón "Guardar cambios" propio: "Tu negocio" y "Programa de puntos"
+- Layout: `grid grid-cols-1 md:grid-cols-2 gap-6 items-start` — apiladas en móvil, side-by-side en desktop (`max-w-5xl`)
+- Logo: upload a Supabase Storage bucket `logos`, path `{business_id}/logo.{ext}`, `upsert: true`; cache-buster: `publicUrl + '?t=' + Date.now()`
+- Preview de logo: recuadro `bg-[#0f0f0f]` con logo circular y nombre en `primary_color` — muestra exactamente cómo se ve en la mini-webapp
+- Slug: validar con `/^[a-z0-9]+(?:-[a-z0-9]+)*$/`; verificar unicidad con `.neq('id', business.id).maybeSingle()` antes del UPDATE
+- Color picker custom (sin librerías): botón swatch → popover con paleta 20 colores + input hex; cierra con click-outside via `useRef` + `document.addEventListener('mousedown')`
+- Preview del color: botón simulado "Canjear recompensa" con `style={{ background: primary_color }}`
+
+## DashboardLayout — responsive
+- **Mobile (< md):** header superior fijo `h-14` con logo-link + nombre negocio + logout; bottom nav fija con 5 ítems (Inicio/Compra/Clientes/Premios/Config) + íconos + labels cortos; active = `text-primary` + barra `2px` en borde superior
+- **Desktop (md+):** sidebar 240px idéntico al original, sin cambios
+- Logo Fidelio (estrella + texto) es `<Link to="/dashboard">` tanto en header móvil como en sidebar desktop
+- Padding en páginas móvil: `pb-24 md:pb-8` en el div contenedor raíz de todas las páginas del dashboard
+- Bottom nav soporta safe area iOS: `style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}`
+
+## Tablas responsivas (móvil)
+- Patrón: `<div className="md:hidden">` con cards + `<div className="hidden md:block">` con tabla — ambos en el mismo render
+- ClientesPage cards: nombre bold + teléfono gris + badge puntos dorado + última visita pequeña; click → drawer
+- RecompensasPage cards: badge tipo (dorado/verde/morado) + puntos con estrella + nombre + descripción + badge activo/inactivo; click → modal edición
+
+## LandingPage (`/`)
+- `src/pages/LandingPage.jsx` — página pública de marketing; ruta `/` usa `<PublicRoute><LandingPage /></PublicRoute>` (redirige a /dashboard si hay sesión)
+- Secciones: Navbar fija → Hero (dark) → Social Proof → Cómo funciona (`id="como-funciona"`) → Para quién es → Pricing → CTA final → Footer
+- Scroll animations: hook `useFadeUp()` inline con `IntersectionObserver` (`threshold: 0.12`); toggle clases `opacity-0 translate-y-5` ↔ `opacity-100 translate-y-0` + `transition-all duration-700 ease-out` — sin librerías externas
+- `PublicRoute` es reutilizable para cualquier página pública que deba redirigir usuarios autenticados (no solo login/register)
+
+## MiniWebAppPage — logo del negocio
+- `business.logo_url` incluido en el SELECT inicial
+- Vista `phone`: logo circular 64px sobre el nombre, con borde `${accent}40`
+- Vista `panel` header: logo circular 40px junto al programa y saludo del cliente
+- Si `logo_url` es null/undefined: se omite la imagen sin romper el layout
