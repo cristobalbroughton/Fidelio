@@ -16,11 +16,14 @@ export function getEffectivePlan(business) {
 
   const expiresAt = business?.pro_expires_at
   if (expiresAt) {
-    const diffDays = (Date.now() - new Date(expiresAt)) / 86_400_000
-    if (diffDays > 0) {
-      if (diffDays <= GRACE_DAYS)
-        return { plan, isGrace: true, daysLeft: Math.ceil(GRACE_DAYS - diffDays) }
-      return { plan: 'free', isGrace: false }
+    const expiresDate = new Date(expiresAt)
+    if (!isNaN(expiresDate.getTime())) {
+      const diffDays = (Date.now() - expiresDate) / 86_400_000
+      if (diffDays > 0) {
+        if (diffDays <= GRACE_DAYS)
+          return { plan, isGrace: true, daysLeft: Math.ceil(GRACE_DAYS - diffDays) }
+        return { plan: 'free', isGrace: false }
+      }
     }
   }
   return { plan, isGrace: false }

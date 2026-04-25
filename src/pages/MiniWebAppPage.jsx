@@ -5,15 +5,9 @@ import { Loader2, Star, CheckCircle2, Lock, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { getEffectivePlan, getPlanLimits } from '../lib/planLimits'
+import { normalizePhone } from '../lib/utils'
 
 // ── Helper ────────────────────────────────────────────────────────────────────
-
-function normalizePhone(raw) {
-  const digits = raw.replace(/\D/g, '')
-  if (digits.startsWith('569')) return `+${digits}`
-  if (digits.startsWith('9') && digits.length === 9) return `+56${digits}`
-  return `+${digits}`
-}
 
 function formatDateLong(iso) {
   return new Date(iso).toLocaleDateString('es-CL', {
@@ -139,6 +133,7 @@ export default function MiniWebAppPage() {
   }
 
   const handleToggleHistory = async () => {
+    if (!customer?.id) return
     if (!showHistory && !historyLoaded) {
       const { data } = await supabase
         .from('transactions')

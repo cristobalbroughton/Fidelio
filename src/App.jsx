@@ -19,16 +19,6 @@ import AdminPage from './pages/AdminPage'
 import ConfiguracionPage from './pages/dashboard/ConfiguracionPage'
 import LandingPage from './pages/LandingPage'
 
-// ── Placeholders ──────────────────────────────────────────────────────────────
-
-function Placeholder({ title }) {
-  return (
-    <div className="p-8">
-      <p className="text-dark/40 text-sm">{title} — próximamente</p>
-    </div>
-  )
-}
-
 function NotFoundPage() {
   return (
     <div className="min-h-screen bg-dark flex items-center justify-center">

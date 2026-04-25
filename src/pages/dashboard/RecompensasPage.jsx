@@ -7,6 +7,7 @@ import {
   PLAN_LIMITS, WA_UPGRADE_LINK,
   getEffectivePlan, getPlanLimits, getUpgradeMessage,
 } from '../../lib/planLimits'
+import { INPUT_CLASS, LABEL_CLASS } from '../../lib/utils'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -21,11 +22,6 @@ const TYPE_STYLE = {
 const EMPTY_FORM = {
   name: '', description: '', points_required: '', type: 'product', is_active: true,
 }
-
-const INPUT_CLASS =
-  'w-full border border-black/[0.08] rounded-lg px-4 py-3 text-dark placeholder-dark/25 focus:outline-none focus:border-primary/50 transition-colors bg-white'
-
-const LABEL_CLASS = 'block text-[13px] font-medium text-dark/55 mb-1.5'
 
 // ── Componente ────────────────────────────────────────────────────────────────
 

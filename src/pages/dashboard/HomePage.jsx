@@ -123,7 +123,8 @@ export default function HomePage() {
       // Q5: points_balance todos los clientes → bar chart
       supabase.from('loyalty_customers')
         .select('points_balance')
-        .eq('business_id', business.id),
+        .eq('business_id', business.id)
+        .limit(1000),
 
     ]).then(([q1, q2, q3, q4, q5]) => {
       if (q1.error || q2.error || q3.error) {

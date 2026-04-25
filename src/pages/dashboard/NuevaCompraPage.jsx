@@ -7,15 +7,9 @@ import {
   PLAN_LIMITS, WA_UPGRADE_LINK,
   getEffectivePlan, getPlanLimits, getUpgradeMessage,
 } from '../../lib/planLimits'
+import { normalizePhone, INPUT_CLASS, LABEL_CLASS } from '../../lib/utils'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function normalizePhone(raw) {
-  const digits = raw.replace(/\D/g, '')
-  if (digits.startsWith('569')) return `+${digits}`
-  if (digits.startsWith('9') && digits.length === 9) return `+56${digits}`
-  return `+${digits}`
-}
 
 function formatCLP(value) {
   const digits = value.replace(/\D/g, '')
@@ -29,11 +23,6 @@ function formatDate(iso) {
 }
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
-
-const INPUT_CLASS =
-  'w-full border border-black/[0.08] rounded-lg px-4 py-3 text-dark placeholder-dark/25 focus:outline-none focus:border-primary/50 transition-colors bg-white'
-
-const LABEL_CLASS = 'block text-[13px] font-medium text-dark/55 mb-1.5'
 
 const BTN_PRIMARY =
   'w-full bg-primary text-[#0f0f0f] font-semibold py-3 rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2'
@@ -274,23 +263,26 @@ export default function NuevaCompraPage() {
   const handleQrFound = async (foundCustomer) => {
     setQrOpen(false)
     setCustomer(foundCustomer)
-
-    const [{ data: visits }, { data: rewardsData }] = await Promise.all([
-      supabase.from('transactions')
-        .select('created_at, points_delta, type, rewards(name)')
-        .eq('customer_id', foundCustomer.id)
-        .eq('business_id', business.id)
-        .order('created_at', { ascending: false })
-        .limit(3),
-      supabase.from('rewards')
-        .select('id, name, points_required')
-        .eq('business_id', business.id)
-        .eq('is_active', true)
-        .order('points_required', { ascending: true }),
-    ])
-    setRecentVisits(visits ?? [])
-    setRewards(rewardsData ?? [])
-    setView('purchase')
+    try {
+      const [{ data: visits }, { data: rewardsData }] = await Promise.all([
+        supabase.from('transactions')
+          .select('created_at, points_delta, type, rewards(name)')
+          .eq('customer_id', foundCustomer.id)
+          .eq('business_id', business.id)
+          .order('created_at', { ascending: false })
+          .limit(3),
+        supabase.from('rewards')
+          .select('id, name, points_required')
+          .eq('business_id', business.id)
+          .eq('is_active', true)
+          .order('points_required', { ascending: true }),
+      ])
+      setRecentVisits(visits ?? [])
+      setRewards(rewardsData ?? [])
+      setView('purchase')
+    } catch {
+      toast.error('Error cargando datos del cliente')
+    }
   }
 
   const handleRedeem = async () => {

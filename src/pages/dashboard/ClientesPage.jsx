@@ -3,6 +3,7 @@ import { Loader2, Search, Star, X, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { INPUT_CLASS } from '../../lib/utils'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -23,9 +24,6 @@ function formatDate(iso) {
 }
 
 // ── Constantes ────────────────────────────────────────────────────────────────
-
-const INPUT_CLASS =
-  'w-full border border-black/[0.08] rounded-lg px-4 py-3 text-dark placeholder-dark/25 focus:outline-none focus:border-primary/50 transition-colors bg-white'
 
 const TX_TYPE_LABEL = { welcome: 'Bienvenida', earn: 'Compra', redeem: 'Canje' }
 

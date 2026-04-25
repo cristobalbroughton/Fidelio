@@ -3,13 +3,9 @@ import { Loader2, Image as ImageIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { INPUT_CLASS, LABEL_CLASS } from '../../lib/utils'
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
-
-const INPUT_CLASS =
-  'w-full border border-black/[0.08] rounded-lg px-4 py-3 text-dark placeholder-dark/25 focus:outline-none focus:border-primary/50 transition-colors bg-white'
-
-const LABEL_CLASS = 'block text-[13px] font-medium text-dark/55 mb-1.5'
 
 const BTN_PRIMARY =
   'w-full bg-primary text-[#0f0f0f] font-semibold py-3 rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2'

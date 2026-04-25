@@ -13,7 +13,7 @@ import { supabase } from '../lib/supabase'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
-const ADMIN_EMAIL = 'cristobal.broughton@gmail.com'
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL
 
 const TICK = { fontSize: 11, fill: 'rgba(15,15,15,0.4)' }
 const TOOLTIP_STYLE = {

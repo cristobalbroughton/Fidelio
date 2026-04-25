@@ -17,12 +17,6 @@ export async function signOut() {
   if (error) throw error
 }
 
-export async function getCurrentUser() {
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error) throw error
-  return user
-}
-
 export function onAuthStateChange(callback) {
   const { data: { subscription } } = supabase.auth.onAuthStateChange(callback)
   return subscription

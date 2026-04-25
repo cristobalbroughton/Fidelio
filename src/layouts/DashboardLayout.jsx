@@ -88,18 +88,15 @@ export default function DashboardLayout() {
     if (!user?.id) return
     supabase
       .from('businesses')
-      .select('id, plan, pro_expires_at')
+      .select('id, plan, pro_expires_at, loyalty_customers(count)')
       .eq('owner_id', user.id)
       .single()
-      .then(async ({ data: biz, error }) => {
+      .then(({ data: biz, error }) => {
         if (error || !biz) return
-        const { count } = await supabase
-          .from('loyalty_customers')
-          .select('*', { count: 'exact', head: true })
-          .eq('business_id', biz.id)
+        const count = biz.loyalty_customers?.[0]?.count ?? 0
         const effective = getEffectivePlan(biz)
         const { maxCustomers } = getPlanLimits(effective.plan)
-        setPlanStatus({ effective, customerCount: count ?? 0, maxCustomers })
+        setPlanStatus({ effective, customerCount: count, maxCustomers })
       })
   }, [user?.id])
 
@@ -208,7 +205,7 @@ export default function DashboardLayout() {
           ))}
 
           {/* Admin link — solo visible para el superadmin */}
-          {user?.email === 'cristobal.broughton@gmail.com' && (
+          {user?.email === import.meta.env.VITE_ADMIN_EMAIL && (
             <NavLink
               to="/admin"
               className={({ isActive }) =>
