@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, Image as ImageIcon } from 'lucide-react'
+import { Loader2, Image as ImageIcon, Lock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -44,7 +44,7 @@ export default function ConfiguracionPage() {
     if (!user?.id) return
     supabase
       .from('businesses')
-      .select('id, name, category, description, slug, logo_url, program_name, points_per_clp, welcome_points, primary_color')
+      .select('id, name, category, description, slug, logo_url, program_name, points_per_clp, welcome_points, primary_color, plan')
       .eq('owner_id', user.id)
       .single()
       .then(({ data, error }) => {
@@ -231,24 +231,38 @@ export default function ConfiguracionPage() {
 
             {/* Upload controls */}
             <div className="pt-1">
-              <label className="cursor-pointer text-[13px] font-medium text-primary hover:text-primary/80 transition-colors">
-                {logoPreview ? 'Cambiar logo' : 'Subir logo'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={e => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    setLogoFile(file)
-                    setLogoPreview(URL.createObjectURL(file))
-                  }}
-                />
-              </label>
-              <p className="text-[11px] text-dark/35 mt-1">PNG, JPG o WebP. Máx 2 MB.</p>
-              <p className="text-[11px] text-dark/30 mt-2 leading-relaxed">
-                Preview real de cómo se verá en la mini-webapp del cliente.
-              </p>
+              {business.plan === 'free' ? (
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold bg-amber-50 border border-amber-200 text-amber-700 mb-2">
+                    <Lock className="w-3 h-3" />
+                    Disponible en Starter
+                  </div>
+                  <p className="text-[11px] text-dark/35 leading-relaxed">
+                    Sube a Starter para mostrar tu logo en la mini-webapp.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <label className="cursor-pointer text-[13px] font-medium text-primary hover:text-primary/80 transition-colors">
+                    {logoPreview ? 'Cambiar logo' : 'Subir logo'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        setLogoFile(file)
+                        setLogoPreview(URL.createObjectURL(file))
+                      }}
+                    />
+                  </label>
+                  <p className="text-[11px] text-dark/35 mt-1">PNG, JPG o WebP. Máx 2 MB.</p>
+                  <p className="text-[11px] text-dark/30 mt-2 leading-relaxed">
+                    Preview real de cómo se verá en la mini-webapp del cliente.
+                  </p>
+                </>
+              )}
             </div>
 
           </div>

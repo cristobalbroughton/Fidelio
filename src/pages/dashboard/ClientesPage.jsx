@@ -62,7 +62,7 @@ export default function ClientesPage() {
     if (!user?.id) return
     supabase
       .from('businesses')
-      .select('id, name, points_per_clp, welcome_points')
+      .select('id, name, points_per_clp, welcome_points, slug')
       .eq('owner_id', user.id)
       .single()
       .then(({ data, error }) => {
@@ -210,7 +210,7 @@ export default function ClientesPage() {
 
         {/* Empty state */}
         {!loadingList && filtered.length === 0 && (
-          <div className="bg-white rounded-2xl border border-black/[0.05] py-16 text-center">
+          <div className="bg-white rounded-2xl border border-black/[0.05] py-14 px-6 text-center">
             {search ? (
               <>
                 <Search className="w-8 h-8 text-dark/15 mx-auto mb-3" />
@@ -218,9 +218,24 @@ export default function ClientesPage() {
               </>
             ) : (
               <>
-                <Users className="w-10 h-10 text-dark/15 mx-auto mb-3" />
-                <p className="text-dark/40 font-medium text-sm">Sin clientes aún</p>
-                <p className="text-dark/25 text-xs mt-1">Los clientes aparecerán al registrar su primera compra.</p>
+                <div className="w-12 h-12 rounded-2xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-5 h-5 text-primary" />
+                </div>
+                <p className="text-dark font-semibold text-[15px] mb-1.5">Aún no tienes clientes</p>
+                <p className="text-dark/45 text-sm leading-relaxed mb-5 max-w-xs mx-auto">
+                  Comparte el link de tu programa con tus clientes para que se registren y empiecen a acumular puntos.
+                </p>
+                {business?.slug && (
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/c/${business.slug}`)
+                      toast.success('Link copiado')
+                    }}
+                    className="inline-flex items-center gap-2 bg-dark/[0.04] hover:bg-dark/[0.07] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[13px] font-mono text-dark/60 transition-colors"
+                  >
+                    {window.location.origin}/c/{business.slug}
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -287,7 +302,7 @@ export default function ClientesPage() {
 
               {!loadingList && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-16 text-center">
+                  <td colSpan={6} className="px-5 py-14 text-center">
                     {search ? (
                       <>
                         <Search className="w-8 h-8 text-dark/15 mx-auto mb-3" />
@@ -295,9 +310,24 @@ export default function ClientesPage() {
                       </>
                     ) : (
                       <>
-                        <Users className="w-10 h-10 text-dark/15 mx-auto mb-3" />
-                        <p className="text-dark/40 font-medium text-sm">Sin clientes aún</p>
-                        <p className="text-dark/25 text-xs mt-1">Los clientes aparecerán aquí al registrar su primera compra.</p>
+                        <div className="w-12 h-12 rounded-2xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-4">
+                          <Users className="w-5 h-5 text-primary" />
+                        </div>
+                        <p className="text-dark font-semibold text-[15px] mb-1.5">Aún no tienes clientes</p>
+                        <p className="text-dark/45 text-sm leading-relaxed mb-4 max-w-sm mx-auto">
+                          Comparte el link de tu programa con tus clientes para que se registren y empiecen a acumular puntos.
+                        </p>
+                        {business?.slug && (
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}/c/${business.slug}`)
+                              toast.success('Link copiado')
+                            }}
+                            className="inline-flex items-center gap-2 bg-dark/[0.04] hover:bg-dark/[0.07] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[13px] font-mono text-dark/60 transition-colors"
+                          >
+                            {window.location.origin}/c/{business.slug}
+                          </button>
+                        )}
                       </>
                     )}
                   </td>

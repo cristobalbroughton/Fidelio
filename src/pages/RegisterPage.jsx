@@ -1,28 +1,103 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Loader2, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 
 export default function RegisterPage() {
   const [businessName, setBusinessName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [email, setEmail]               = useState('')
+  const [password, setPassword]         = useState('')
+  const [submitting, setSubmitting]     = useState(false)
+  const [resending, setResending]       = useState(false)
+  const [resendError, setResendError]   = useState('')
+  const [view, setView]                 = useState('form') // 'form' | 'check-email'
   const { signUp } = useAuth()
-  const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSubmitting(true)
     try {
       await signUp(email, password)
-      navigate('/onboarding', { state: { businessName } })
+      setView('check-email')
     } catch (err) {
       toast.error(err.message)
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handleResend = async () => {
+    setResending(true)
+    setResendError('')
+    try {
+      const { error } = await supabase.auth.resend({ type: 'signup', email })
+      if (error) throw error
+      toast.success('Email reenviado')
+    } catch (err) {
+      const isRateLimit =
+        err?.status === 429 ||
+        err?.message?.toLowerCase().includes('rate limit')
+      setResendError(
+        isRateLimit
+          ? 'Ya enviamos un email recientemente. Espera unos minutos antes de solicitar otro.'
+          : 'No pudimos reenviar el email. Intenta de nuevo.'
+      )
+    } finally {
+      setResending(false)
+    }
+  }
+
+  if (view === 'check-email') {
+    return (
+      <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-bold text-primary tracking-tight">Fidelio</h1>
+          </div>
+
+          <div className="bg-[#1a1a1a] rounded-2xl p-8 border border-white/10 text-center">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5"
+              style={{ background: 'rgba(201,168,76,0.12)' }}
+            >
+              <Mail className="w-7 h-7 text-primary" />
+            </div>
+
+            <h2 className="text-xl font-semibold text-[#f4f1ea] mb-3">
+              Revisa tu email
+            </h2>
+            <p className="text-[#f4f1ea]/50 text-sm leading-relaxed mb-7">
+              Te enviamos un link de confirmación a{' '}
+              <span className="text-[#f4f1ea]/80 font-medium">{email}</span>.
+              Haz click en el link para activar tu cuenta.
+            </p>
+
+            <button
+              onClick={handleResend}
+              disabled={resending}
+              className="w-full border border-white/10 text-[#f4f1ea]/60 hover:text-[#f4f1ea] hover:border-white/20 font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-[14px] disabled:opacity-40"
+            >
+              {resending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Reenviar email
+            </button>
+            {resendError && (
+              <p className="text-red-400 text-[12px] mt-2 mb-2 leading-snug">{resendError}</p>
+            )}
+
+            <button
+              onClick={() => { setView('form'); setResendError('') }}
+              className="text-[13px] text-[#f4f1ea]/30 hover:text-[#f4f1ea]/50 transition-colors"
+            >
+              ¿Email incorrecto? Volver al registro
+            </button>
+          </div>
+
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -94,6 +169,7 @@ export default function RegisterPage() {
             </Link>
           </p>
         </div>
+
       </div>
     </div>
   )

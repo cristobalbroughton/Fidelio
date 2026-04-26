@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { Loader2, Star, CheckCircle2, Lock, ArrowLeft } from 'lucide-react'
+import { Loader2, Star, CheckCircle2, Lock, ArrowLeft, Share2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { getEffectivePlan, getPlanLimits } from '../lib/planLimits'
@@ -51,6 +51,7 @@ export default function MiniWebAppPage() {
           .select('id, name, description, points_required, type')
           .eq('business_id', data.id)
           .eq('is_active', true)
+          .is('deleted_at', null)
           .order('points_required', { ascending: true })
           .then(({ data: rData }) => setRewards(rData ?? []))
         setView('phone')
@@ -132,6 +133,16 @@ export default function MiniWebAppPage() {
     }
   }
 
+  const handleShare = () => {
+    const url = window.location.href
+    const text = `Estoy acumulando puntos en ${business.name}. Únete al club y empieza a ganar recompensas: ${url}`
+    if (navigator.share) {
+      navigator.share({ text }).catch(() => {})
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+    }
+  }
+
   const handleToggleHistory = async () => {
     if (!customer?.id) return
     if (!showHistory && !historyLoaded) {
@@ -204,7 +215,7 @@ export default function MiniWebAppPage() {
           <>
             {/* Logo / header negocio */}
             <div className="pt-16 pb-10 text-center">
-              {business.logo_url && (
+              {business.logo_url && business.plan !== 'free' && (
                 <img
                   src={business.logo_url}
                   alt={business.name}
@@ -251,9 +262,13 @@ export default function MiniWebAppPage() {
               </div>
             </div>
 
-            <p className="text-center text-white/20 text-xs pb-4 pt-8">
-              {business.name} · Powered by Fidelio
-            </p>
+            {business.plan === 'free' && (
+              <p className="text-center text-white/20 text-xs pb-4 pt-8">
+                <a href="/" className="hover:text-white/35 transition-colors">
+                  Powered by Fidelio
+                </a>
+              </p>
+            )}
           </>
         )}
 
@@ -338,7 +353,7 @@ export default function MiniWebAppPage() {
             {/* Header */}
             <div className="pt-10 pb-6 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                {business.logo_url && (
+                {business.logo_url && business.plan !== 'free' && (
                   <img
                     src={business.logo_url}
                     alt={business.name}
@@ -532,9 +547,36 @@ export default function MiniWebAppPage() {
               </div>
             </div>
 
-            <p className="text-center text-white/15 text-xs pb-4 pt-2">
-              {business.name} · Powered by Fidelio
-            </p>
+            {/* Compartir viral */}
+            <div
+              className="mb-5 rounded-2xl px-5 py-4 border flex items-center gap-4"
+              style={{ background: `${accent}0d`, borderColor: `${accent}20` }}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-white/70 text-[13px] font-medium leading-snug">
+                  ¿Tienes un amigo al que le gustaría esto?
+                </p>
+                <p className="text-white/35 text-[11px] mt-0.5">
+                  Invítalo al programa de {business.name}
+                </p>
+              </div>
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-2.5 rounded-xl shrink-0 transition-opacity active:opacity-70"
+                style={{ background: accent, color: '#0f0f0f' }}
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                Compartir
+              </button>
+            </div>
+
+            {business.plan === 'free' && (
+              <p className="text-center text-white/15 text-xs pb-4 pt-2">
+                <a href="/" className="hover:text-white/25 transition-colors">
+                  Powered by Fidelio
+                </a>
+              </p>
+            )}
           </>
         )}
 

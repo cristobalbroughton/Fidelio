@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, Search, CheckCircle2, Star, X, QrCode } from 'lucide-react'
+import { Loader2, Search, CheckCircle2, Star, X, QrCode, ShoppingBag } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -119,6 +119,7 @@ export default function NuevaCompraPage() {
             .select('id, name, points_required')
             .eq('business_id', business.id)
             .eq('is_active', true)
+            .is('deleted_at', null)
             .order('points_required', { ascending: true }),
         ])
 
@@ -275,6 +276,7 @@ export default function NuevaCompraPage() {
           .select('id, name, points_required')
           .eq('business_id', business.id)
           .eq('is_active', true)
+          .is('deleted_at', null)
           .order('points_required', { ascending: true }),
       ])
       setRecentVisits(visits ?? [])
@@ -403,6 +405,22 @@ export default function NuevaCompraPage() {
               <QrCode className="w-4 h-4" />
               Escanear QR del cliente
             </button>
+
+            {!phone.trim() && (
+              <div className="mt-4 bg-dark/[0.02] border border-black/[0.05] rounded-2xl p-5 text-center">
+                <div className="w-10 h-10 rounded-xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-3">
+                  <ShoppingBag className="w-4.5 h-4.5 text-primary" />
+                </div>
+                <p className="text-dark font-semibold text-[14px] mb-1">Registra la primera compra</p>
+                <p className="text-dark/45 text-[13px] leading-relaxed mb-3">
+                  Busca al cliente por teléfono o escanea su QR, ingresa el monto y los puntos se acumulan automáticamente.
+                </p>
+                <p className="text-[11px] text-dark/30 flex items-center justify-center gap-1.5">
+                  <QrCode className="w-3 h-3" />
+                  También puedes escanear el QR del cliente con la cámara
+                </p>
+              </div>
+            )}
           </div>
         )}
 

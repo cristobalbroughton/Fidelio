@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Users, Star, ShoppingBag, TrendingUp, Loader2, AlertTriangle } from 'lucide-react'
+import { Users, Star, ShoppingBag, TrendingUp, Loader2, AlertTriangle, X, CheckCircle2 } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -67,6 +67,7 @@ export default function HomePage() {
   const [lineData, setLineData]         = useState([])
   const [barData, setBarData]           = useState([])
   const [loadingData, setLoadingData]   = useState(false)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
 
   // ── Carga business ──────────────────────────────────────────────────────────
 
@@ -74,12 +75,16 @@ export default function HomePage() {
     if (!user?.id) return
     supabase
       .from('businesses')
-      .select('id, name, failed_registrations')
+      .select('id, name, failed_registrations, plan, primary_color, logo_url, slug')
       .eq('owner_id', user.id)
       .single()
       .then(({ data, error }) => {
         if (error) toast.error('Error cargando datos del negocio')
-        else setBusiness(data)
+        else {
+          setBusiness(data)
+          const dismissed = localStorage.getItem(`fidelio_onboarding_v1_${data?.id}`)
+          if (dismissed) setBannerDismissed(true)
+        }
         setLB(false)
       })
   }, [user?.id])
@@ -126,7 +131,13 @@ export default function HomePage() {
         .eq('business_id', business.id)
         .limit(1000),
 
-    ]).then(([q1, q2, q3, q4, q5]) => {
+      // Q6: total earn txs ever → onboarding step 3
+      supabase.from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', business.id)
+        .eq('type', 'earn'),
+
+    ]).then(([q1, q2, q3, q4, q5, q6]) => {
       if (q1.error || q2.error || q3.error) {
         toast.error('Error cargando métricas')
       } else {
@@ -135,6 +146,7 @@ export default function HomePage() {
           puntosEsteMes:  (q2.data ?? []).reduce((s, t) => s + t.points_delta, 0),
           visitasEsteMes: (q2.data ?? []).length,
           canjesEsteMes:  q3.count ?? 0,
+          earnTxTotal:    q6.count ?? 0,
         })
         setLineData(buildLineData(q4.data ?? []))
         setBarData(buildBarData(q5.data ?? []))
@@ -179,6 +191,73 @@ export default function HomePage() {
           Resumen de {business?.name ?? 'tu programa de fidelización'}.
         </p>
       </div>
+
+      {/* ── Banner de onboarding ──────────────────────────────────────────── */}
+      {(() => {
+        if (bannerDismissed || !metrics) return null
+        const isFree = business?.plan === 'free'
+        const step1Done = isFree
+          ? !!(business?.name && business?.primary_color)
+          : !!(business?.name && business?.primary_color && business?.logo_url)
+        const step2Done = (metrics.totalClientes ?? 0) >= 1
+        const step3Done = (metrics.earnTxTotal ?? 0) >= 1
+        if (step1Done && step2Done && step3Done) return null
+
+        const steps = [
+          { label: 'Configura tu negocio',           done: step1Done },
+          { label: 'Comparte tu link con tus clientes', done: step2Done },
+          { label: 'Registra tu primera compra',     done: step3Done },
+        ]
+
+        const handleDismiss = () => {
+          localStorage.setItem(`fidelio_onboarding_v1_${business.id}`, '1')
+          setBannerDismissed(true)
+        }
+
+        return (
+          <div className="bg-white rounded-2xl border border-primary/20 shadow-sm p-5 mb-8 relative">
+            <button
+              onClick={handleDismiss}
+              className="absolute top-4 right-4 text-dark/20 hover:text-dark/50 transition-colors"
+              aria-label="Cerrar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <p className="text-[13px] font-semibold text-dark/70 mb-4">
+              Bienvenido a Fidelio — empieza en 3 pasos
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              {steps.map((s, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center gap-3 flex-1 px-4 py-3 rounded-xl border transition-colors ${
+                    s.done
+                      ? 'bg-primary/[0.05] border-primary/20'
+                      : 'bg-dark/[0.02] border-black/[0.05]'
+                  }`}
+                >
+                  <span
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 ${
+                      s.done ? 'bg-primary text-[#0f0f0f]' : 'bg-dark/[0.08] text-dark/30'
+                    }`}
+                  >
+                    {s.done ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
+                  </span>
+                  <span
+                    className={`text-[13px] font-medium leading-tight ${
+                      s.done ? 'text-dark/40 line-through' : 'text-dark/70'
+                    }`}
+                  >
+                    {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Tarjetas métricas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">

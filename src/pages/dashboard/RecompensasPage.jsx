@@ -75,6 +75,7 @@ export default function RecompensasPage() {
       .from('rewards')
       .select('id, name, description, points_required, type, is_active')
       .eq('business_id', business.id)
+      .is('deleted_at', null)
       .order('points_required', { ascending: true })
       .then(({ data, error }) => {
         if (error) toast.error('Error cargando recompensas')
@@ -163,7 +164,7 @@ export default function RecompensasPage() {
     try {
       const { error } = await supabase
         .from('rewards')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', editing.id)
       if (error) throw error
       setRewards(prev => prev.filter(r => r.id !== editing.id))
@@ -268,10 +269,21 @@ export default function RecompensasPage() {
         )}
 
         {!loadingList && rewards.length === 0 && (
-          <div className="bg-white rounded-2xl border border-black/[0.05] py-16 text-center">
-            <Gift className="w-10 h-10 text-dark/15 mx-auto mb-3" />
-            <p className="text-dark/40 font-medium text-sm">Sin recompensas aún</p>
-            <p className="text-dark/25 text-xs mt-1">Crea tu primera recompensa para que los clientes puedan canjear sus puntos.</p>
+          <div className="bg-white rounded-2xl border border-black/[0.05] py-14 px-6 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-4">
+              <Gift className="w-5 h-5 text-primary" />
+            </div>
+            <p className="text-dark font-semibold text-[15px] mb-1.5">Crea tu primera recompensa</p>
+            <p className="text-dark/45 text-sm leading-relaxed mb-5 max-w-xs mx-auto">
+              Define qué pueden canjear tus clientes con sus puntos — un café gratis, un descuento, lo que quieras.
+            </p>
+            <button
+              onClick={handleNewReward}
+              className="inline-flex items-center gap-2 bg-primary text-[#0f0f0f] text-[13px] font-semibold px-4 py-2.5 rounded-xl hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Nueva recompensa
+            </button>
           </div>
         )}
 
@@ -345,10 +357,21 @@ export default function RecompensasPage() {
 
               {!loadingList && rewards.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-5 py-16 text-center">
-                    <Gift className="w-10 h-10 text-dark/15 mx-auto mb-3" />
-                    <p className="text-dark/40 font-medium text-sm">Sin recompensas aún</p>
-                    <p className="text-dark/25 text-xs mt-1">Crea tu primera recompensa para que los clientes puedan canjear sus puntos.</p>
+                  <td colSpan={4} className="px-5 py-14 text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-4">
+                      <Gift className="w-5 h-5 text-primary" />
+                    </div>
+                    <p className="text-dark font-semibold text-[15px] mb-1.5">Crea tu primera recompensa</p>
+                    <p className="text-dark/45 text-sm leading-relaxed mb-4 max-w-sm mx-auto">
+                      Define qué pueden canjear tus clientes con sus puntos — un café gratis, un descuento, lo que quieras.
+                    </p>
+                    <button
+                      onClick={handleNewReward}
+                      className="inline-flex items-center gap-2 bg-primary text-[#0f0f0f] text-[13px] font-semibold px-4 py-2.5 rounded-xl hover:bg-primary/90 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Nueva recompensa
+                    </button>
                   </td>
                 </tr>
               )}
