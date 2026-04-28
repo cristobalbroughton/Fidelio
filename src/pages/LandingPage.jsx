@@ -475,9 +475,12 @@ function Footer() {
           <Link to="/register" className="text-white/35 hover:text-white/60 text-sm transition-colors">
             Registrarse
           </Link>
+          <Link to="/privacidad" className="text-white/35 hover:text-white/60 text-sm transition-colors">
+            Política de privacidad
+          </Link>
         </div>
 
-        <p className="text-white/20 text-xs">© 2025 Fidelio · Chile</p>
+        <p className="text-white/20 text-xs">© 2026 Fidelio · Chile</p>
       </div>
     </footer>
   )

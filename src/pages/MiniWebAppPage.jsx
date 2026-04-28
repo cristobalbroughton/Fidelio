@@ -262,13 +262,16 @@ export default function MiniWebAppPage() {
               </div>
             </div>
 
-            {business.plan === 'free' && (
-              <p className="text-center text-white/20 text-xs pb-4 pt-8">
+            <p className="text-center text-white/20 text-xs pb-4 pt-8 flex items-center justify-center gap-3 flex-wrap">
+              {business.plan === 'free' && (
                 <a href="/" className="hover:text-white/35 transition-colors">
                   Powered by Fidelio
                 </a>
-              </p>
-            )}
+              )}
+              <a href="/privacidad" className="hover:text-white/35 transition-colors">
+                Privacidad
+              </a>
+            </p>
           </>
         )}
 
@@ -570,13 +573,16 @@ export default function MiniWebAppPage() {
               </button>
             </div>
 
-            {business.plan === 'free' && (
-              <p className="text-center text-white/15 text-xs pb-4 pt-2">
+            <p className="text-center text-white/15 text-xs pb-4 pt-2 flex items-center justify-center gap-3 flex-wrap">
+              {business.plan === 'free' && (
                 <a href="/" className="hover:text-white/25 transition-colors">
                   Powered by Fidelio
                 </a>
-              </p>
-            )}
+              )}
+              <a href="/privacidad" className="hover:text-white/25 transition-colors">
+                Privacidad
+              </a>
+            </p>
           </>
         )}
 

@@ -18,6 +18,7 @@ import MiniWebAppPage from './pages/MiniWebAppPage'
 import AdminPage from './pages/AdminPage'
 import ConfiguracionPage from './pages/dashboard/ConfiguracionPage'
 import LandingPage from './pages/LandingPage'
+import PrivacidadPage from './pages/PrivacidadPage'
 
 function NotFoundPage() {
   return (
@@ -74,6 +75,9 @@ export default function App() {
             <Route path="/admin" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
               <Route index element={<AdminPage />} />
             </Route>
+
+            {/* Página de privacidad — pública */}
+            <Route path="/privacidad" element={<PrivacidadPage />} />
 
             {/* 404 */}
             <Route path="*" element={<NotFoundPage />} />
