@@ -13,10 +13,16 @@ export default function RegisterPage() {
   const [resending, setResending]       = useState(false)
   const [resendError, setResendError]   = useState('')
   const [view, setView]                 = useState('form') // 'form' | 'check-email'
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [termsError, setTermsError]       = useState(false)
   const { signUp } = useAuth()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!termsAccepted) {
+      setTermsError(true)
+      return
+    }
     setSubmitting(true)
     try {
       await signUp(email, password)
@@ -150,6 +156,42 @@ export default function RegisterPage() {
                 minLength={6}
                 className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-4 py-3 text-[#f4f1ea] placeholder-[#f4f1ea]/20 focus:outline-none focus:border-primary/50 transition-colors"
               />
+            </div>
+
+            <div>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={e => { setTermsAccepted(e.target.checked); setTermsError(false) }}
+                  className="mt-0.5 w-4 h-4 shrink-0 accent-[#c9a84c] cursor-pointer"
+                />
+                <span className="text-[13px] text-[#f4f1ea]/50 leading-snug">
+                  Al crear una cuenta, aceptas nuestros{' '}
+                  <a
+                    href="/terminos"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Términos de uso
+                  </a>
+                  {' '}y nuestra{' '}
+                  <a
+                    href="/privacidad"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Política de privacidad
+                  </a>
+                </span>
+              </label>
+              {termsError && (
+                <p className="text-red-400 text-[12px] mt-1.5 ml-7">
+                  Debes aceptar los términos para continuar
+                </p>
+              )}
             </div>
 
             <button

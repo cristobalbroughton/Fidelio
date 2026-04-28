@@ -19,6 +19,7 @@ import AdminPage from './pages/AdminPage'
 import ConfiguracionPage from './pages/dashboard/ConfiguracionPage'
 import LandingPage from './pages/LandingPage'
 import PrivacidadPage from './pages/PrivacidadPage'
+import TerminosPage from './pages/TerminosPage'
 
 function NotFoundPage() {
   return (
@@ -76,8 +77,9 @@ export default function App() {
               <Route index element={<AdminPage />} />
             </Route>
 
-            {/* Página de privacidad — pública */}
+            {/* Páginas legales — públicas */}
             <Route path="/privacidad" element={<PrivacidadPage />} />
+            <Route path="/terminos"   element={<TerminosPage />} />
 
             {/* 404 */}
             <Route path="*" element={<NotFoundPage />} />

@@ -475,6 +475,9 @@ function Footer() {
           <Link to="/register" className="text-white/35 hover:text-white/60 text-sm transition-colors">
             Registrarse
           </Link>
+          <Link to="/terminos" className="text-white/35 hover:text-white/60 text-sm transition-colors">
+            Términos de uso
+          </Link>
           <Link to="/privacidad" className="text-white/35 hover:text-white/60 text-sm transition-colors">
             Política de privacidad
           </Link>
