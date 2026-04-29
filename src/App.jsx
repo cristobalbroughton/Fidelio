@@ -20,6 +20,7 @@ import ConfiguracionPage from './pages/dashboard/ConfiguracionPage'
 import LandingPage from './pages/LandingPage'
 import PrivacidadPage from './pages/PrivacidadPage'
 import TerminosPage from './pages/TerminosPage'
+import AyudaPage from './pages/AyudaPage'
 
 function NotFoundPage() {
   return (
@@ -80,6 +81,9 @@ export default function App() {
             {/* Páginas legales — públicas */}
             <Route path="/privacidad" element={<PrivacidadPage />} />
             <Route path="/terminos"   element={<TerminosPage />} />
+
+            {/* Ayuda — protegida, standalone (sin DashboardLayout) */}
+            <Route path="/ayuda" element={<ProtectedRoute><AyudaPage /></ProtectedRoute>} />
 
             {/* 404 */}
             <Route path="*" element={<NotFoundPage />} />
