@@ -67,6 +67,9 @@ export default function NuevaCompraPage() {
   // Plan limit
   const [limitError, setLimitError] = useState(null)
 
+  // Empty state visibility
+  const [hasTransactions, setHasTransactions] = useState(null)
+
   // Derived
   const amountRaw = Number(amount.replace(/\./g, ''))
   const pointsPreview =
@@ -83,7 +86,15 @@ export default function NuevaCompraPage() {
       .single()
       .then(({ data, error }) => {
         if (error) toast.error('Error cargando datos del negocio')
-        else setBusiness(data)
+        else {
+          setBusiness(data)
+          supabase
+            .from('transactions')
+            .select('*', { count: 'exact', head: true })
+            .eq('business_id', data.id)
+            .eq('type', 'earn')
+            .then(({ count }) => setHasTransactions((count ?? 0) > 0))
+        }
         setLoadingBusiness(false)
       })
   }, [user?.id])
@@ -406,7 +417,7 @@ export default function NuevaCompraPage() {
               Escanear QR del cliente
             </button>
 
-            {!phone.trim() && (
+            {!phone.trim() && hasTransactions === false && (
               <div className="mt-4 bg-dark/[0.02] border border-black/[0.05] rounded-2xl p-5 text-center">
                 <div className="w-10 h-10 rounded-xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-3">
                   <ShoppingBag className="w-4.5 h-4.5 text-primary" />

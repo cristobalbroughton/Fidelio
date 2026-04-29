@@ -30,7 +30,7 @@ const TX_TYPE_LABEL = { welcome: 'Bienvenida', earn: 'Compra', redeem: 'Canje' }
 const TX_TYPE_COLOR = {
   welcome: 'text-primary',
   earn:    'text-emerald-600',
-  redeem:  'text-dark/50',
+  redeem:  'text-red-500',
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -458,7 +458,7 @@ export default function ClientesPage() {
                   {/* Derecha: puntos + monto */}
                   <div className="text-right">
                     <p className={`text-[13px] font-semibold ${TX_TYPE_COLOR[tx.type]}`}>
-                      {tx.type === 'redeem' ? '−' : '+'}{tx.points_delta.toLocaleString('es-CL')} pts
+                      {tx.type !== 'redeem' && '+'}{tx.points_delta.toLocaleString('es-CL')} pts
                     </p>
                     {tx.type === 'earn' && tx.amount_clp > 0 && (
                       <p className="text-[12px] text-dark/40 mt-0.5">

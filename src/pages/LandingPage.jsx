@@ -340,7 +340,7 @@ const PLANS = [
     price: '$59.990',
     period: '/mes',
     desc: 'Para cadenas y multi-sucursal',
-    features: ['Clientes ilimitados', 'Multi-sucursal', 'Campañas de WhatsApp', 'Soporte dedicado'],
+    features: ['Clientes ilimitados', 'Roles de usuario', 'Notificaciones WhatsApp', 'Soporte dedicado'],
     cta: 'Empezar',
     highlight: false,
   },
