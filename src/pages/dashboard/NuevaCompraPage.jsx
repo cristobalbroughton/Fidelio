@@ -3,6 +3,7 @@ import { Loader2, Search, CheckCircle2, Star, X, QrCode, ShoppingBag } from 'luc
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { getCashierSession, isCashierSession } from '../../lib/cashierSession'
 import {
   PLAN_LIMITS, WA_UPGRADE_LINK,
   getEffectivePlan, getPlanLimits, getUpgradeMessage,
@@ -70,6 +71,9 @@ export default function NuevaCompraPage() {
   // Empty state visibility
   const [hasTransactions, setHasTransactions] = useState(null)
 
+  // Note field (earn & redeem)
+  const [note, setNote] = useState('')
+
   // Derived
   const amountRaw = Number(amount.replace(/\./g, ''))
   const pointsPreview =
@@ -78,13 +82,8 @@ export default function NuevaCompraPage() {
   // ── Load business on mount ─────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!user?.id) return
-    supabase
-      .from('businesses')
-      .select('id, name, points_per_clp, welcome_points, plan, pro_expires_at')
-      .eq('owner_id', user.id)
-      .single()
-      .then(({ data, error }) => {
+    const loadBiz = (query) =>
+      query.single().then(({ data, error }) => {
         if (error) toast.error('Error cargando datos del negocio')
         else {
           setBusiness(data)
@@ -97,6 +96,20 @@ export default function NuevaCompraPage() {
         }
         setLoadingBusiness(false)
       })
+
+    const cashier = getCashierSession()
+    if (cashier) {
+      loadBiz(supabase
+        .from('businesses')
+        .select('id, name, points_per_clp, welcome_points, plan, pro_expires_at')
+        .eq('id', cashier.business_id))
+    } else {
+      if (!user?.id) return
+      loadBiz(supabase
+        .from('businesses')
+        .select('id, name, points_per_clp, welcome_points, plan, pro_expires_at')
+        .eq('owner_id', user.id))
+    }
   }, [user?.id])
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -231,6 +244,8 @@ export default function NuevaCompraPage() {
           type: 'earn',
           points_delta: points,
           amount_clp: amountRaw,
+          cashier_id: isCashierSession() ? getCashierSession().cashier_id : null,
+          note: note.trim() || null,
         })
 
       if (txError) throw txError
@@ -268,6 +283,7 @@ export default function NuevaCompraPage() {
     setRecentVisits([])
     setRewards([])
     setAmount('')
+    setNote('')
     setResult(null)
     setRedeemTarget(null)
   }
@@ -324,6 +340,8 @@ export default function NuevaCompraPage() {
         points_delta: -redeemTarget.points_required,
         amount_clp:   0,
         reward_id:    redeemTarget.id,
+        cashier_id:   isCashierSession() ? getCashierSession().cashier_id : null,
+        note:         note.trim() || null,
       })
       if (txErr) throw txErr
 
@@ -417,7 +435,7 @@ export default function NuevaCompraPage() {
               Escanear QR del cliente
             </button>
 
-            {!phone.trim() && hasTransactions === false && (
+            {!phone.trim() && hasTransactions === false && !isCashierSession() && (
               <div className="mt-4 bg-dark/[0.02] border border-black/[0.05] rounded-2xl p-5 text-center">
                 <div className="w-10 h-10 rounded-xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-3">
                   <ShoppingBag className="w-4.5 h-4.5 text-primary" />
@@ -582,6 +600,20 @@ export default function NuevaCompraPage() {
                   = {pointsPreview.toLocaleString('es-CL')} {pointsPreview === 1 ? 'punto' : 'puntos'}
                 </p>
               )}
+            </div>
+
+            {/* Note field */}
+            <div>
+              <label className={LABEL_CLASS}>
+                Nota <span className="text-dark/25 font-normal">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                placeholder="Ej: Boleta #1234"
+                className={INPUT_CLASS}
+              />
             </div>
 
             <button

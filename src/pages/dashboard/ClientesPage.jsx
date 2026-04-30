@@ -113,7 +113,7 @@ export default function ClientesPage() {
     try {
       const { data, error } = await supabase
         .from('transactions')
-        .select('id, type, points_delta, amount_clp, created_at')
+        .select('id, type, points_delta, amount_clp, created_at, note, team_members!cashier_id(name)')
         .eq('customer_id', customer.id)
         .eq('business_id', business.id)
         .order('created_at', { ascending: false })
@@ -447,12 +447,18 @@ export default function ClientesPage() {
                   key={tx.id}
                   className="flex items-center justify-between py-3 border-b border-black/[0.04] last:border-0"
                 >
-                  {/* Izquierda: tipo + fecha */}
+                  {/* Izquierda: tipo + fecha + cajero + nota */}
                   <div>
                     <span className={`text-[13px] font-medium ${TX_TYPE_COLOR[tx.type]}`}>
                       {TX_TYPE_LABEL[tx.type]}
                     </span>
                     <p className="text-[12px] text-dark/35 mt-0.5">{formatDate(tx.created_at)}</p>
+                    {tx.team_members?.name && (
+                      <p className="text-[11px] text-dark/30 mt-0.5">por {tx.team_members.name}</p>
+                    )}
+                    {tx.note && (
+                      <p className="text-[11px] text-dark/30 mt-0.5 truncate max-w-[160px]">{tx.note}</p>
+                    )}
                   </div>
 
                   {/* Derecha: puntos + monto */}

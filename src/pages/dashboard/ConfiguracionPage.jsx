@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, Image as ImageIcon, Lock } from 'lucide-react'
+import { Loader2, Image as ImageIcon, Lock, Eye, EyeOff, UserPlus, X } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
+import bcrypt from 'bcryptjs'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -37,6 +39,16 @@ export default function ConfiguracionPage() {
   // Sección 2 — Programa de puntos
   const [s2, setS2]                   = useState({ program_name: '', points_per_clp: '', welcome_points: '', primary_color: '#c9a84c' })
   const [savingS2, setSavingS2]       = useState(false)
+
+  // Sección 3 — Equipo (Pro only)
+  const [members, setMembers]         = useState([])
+  const [loadingMembers, setLM]       = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [newName, setNewName]         = useState('')
+  const [newPin, setNewPin]           = useState('')
+  const [showPin, setShowPin]         = useState(false)
+  const [savingMember, setSavingMember] = useState(false)
+  const [pinError, setPinError]       = useState('')
 
   // ── Carga inicial ──────────────────────────────────────────────────────────
 
@@ -148,6 +160,69 @@ export default function ConfiguracionPage() {
       toast.error(err.message ?? 'Error al guardar')
     } finally {
       setSavingS2(false)
+    }
+  }
+
+  // ── Equipo handlers ───────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!business?.id || business.plan !== 'pro') return
+    setLM(true)
+    supabase
+      .from('team_members')
+      .select('id, name, is_active, created_at')
+      .eq('business_id', business.id)
+      .order('created_at')
+      .then(({ data }) => { setMembers(data ?? []); setLM(false) })
+  }, [business?.id, business?.plan])
+
+  const handleToggleMember = async (id, isActive) => {
+    const { error } = await supabase
+      .from('team_members')
+      .update({ is_active: isActive })
+      .eq('id', id)
+    if (error) { toast.error('Error actualizando cajero'); return }
+    setMembers(ms => ms.map(m => m.id === id ? { ...m, is_active: isActive } : m))
+  }
+
+  const handleAddMember = async () => {
+    if (!newName.trim()) { toast.error('El nombre es requerido'); return }
+    if (!/^\d{6}$/.test(newPin)) { setPinError('El PIN debe tener exactamente 6 dígitos numéricos'); return }
+    setPinError('')
+    setSavingMember(true)
+    try {
+      const { data: activeWithHash } = await supabase
+        .from('team_members')
+        .select('pin_hash')
+        .eq('business_id', business.id)
+        .eq('is_active', true)
+      for (const m of (activeWithHash ?? [])) {
+        if (await bcrypt.compare(newPin, m.pin_hash)) {
+          setPinError('Este PIN ya está en uso por otro cajero')
+          return
+        }
+      }
+
+      const pin_hash = await bcrypt.hash(newPin, 10)
+      const { error } = await supabase
+        .from('team_members')
+        .insert({ business_id: business.id, name: newName.trim(), pin_hash })
+      if (error) throw error
+
+      const { data: updated } = await supabase
+        .from('team_members')
+        .select('id, name, is_active, created_at')
+        .eq('business_id', business.id)
+        .order('created_at')
+      setMembers(updated ?? [])
+      setShowAddModal(false)
+      setNewName('')
+      setNewPin('')
+      toast.success('Cajero creado')
+    } catch (err) {
+      toast.error(err.message ?? 'Error al crear cajero')
+    } finally {
+      setSavingMember(false)
     }
   }
 
@@ -429,6 +504,161 @@ export default function ConfiguracionPage() {
       </div>
 
       </div>{/* end grid */}
+
+      {/* ── Sección 3 — Equipo (Pro only) ──────────────────────────────── */}
+      {business.plan === 'pro' && (
+        <div className="mt-6 bg-white rounded-2xl border border-black/[0.05] shadow-sm p-6 space-y-5">
+
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="text-[15px] font-semibold text-dark">Equipo</h2>
+              <p className="text-[13px] text-dark/40 mt-0.5">Gestiona los cajeros de tu negocio.</p>
+            </div>
+            <button
+              onClick={() => { setNewName(''); setNewPin(''); setPinError(''); setShowPin(false); setShowAddModal(true) }}
+              className="flex items-center gap-1.5 text-[13px] font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              Agregar cajero
+            </button>
+          </div>
+
+          <div className="h-px bg-black/[0.05]" />
+
+          {loadingMembers && (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 text-primary animate-spin" />
+            </div>
+          )}
+
+          {!loadingMembers && members.length === 0 && (
+            <p className="text-[13px] text-dark/35 py-2">
+              No hay cajeros aún. Agrega uno para que puedan registrar compras.
+            </p>
+          )}
+
+          {!loadingMembers && members.length > 0 && (
+            <div className="space-y-2">
+              {members.map(m => (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between gap-3 py-3 px-4 rounded-xl bg-dark/[0.02] border border-black/[0.04]"
+                >
+                  <div className="min-w-0">
+                    <p className={`text-[14px] font-medium ${m.is_active ? 'text-dark' : 'text-dark/35'}`}>
+                      {m.name}
+                    </p>
+                    <p className="text-[11px] text-dark/30 mt-0.5">
+                      Desde {format(parseISO(m.created_at), 'dd/MM/yyyy')}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleToggleMember(m.id, !m.is_active)}
+                    title={m.is_active ? 'Desactivar' : 'Activar'}
+                    className={[
+                      'relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 flex-none',
+                      m.is_active ? 'bg-primary' : 'bg-dark/15',
+                    ].join(' ')}
+                  >
+                    <span className={[
+                      'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-200',
+                      m.is_active ? 'left-[18px]' : 'left-0.5',
+                    ].join(' ')} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ── Modal: Agregar cajero ───────────────────────────────────────── */}
+      {showAddModal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/40 z-40"
+            onClick={() => !savingMember && setShowAddModal(false)}
+          />
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+
+              <div className="flex items-center justify-between">
+                <h3 className="text-[16px] font-semibold text-dark">Agregar cajero</h3>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  disabled={savingMember}
+                  className="text-dark/35 hover:text-dark transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div>
+                <label className={LABEL_CLASS}>Nombre <span className="text-red-400">*</span></label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  placeholder="Ej: Juan"
+                  className={INPUT_CLASS}
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className={LABEL_CLASS}>PIN de 6 dígitos <span className="text-red-400">*</span></label>
+                <div className="relative">
+                  <input
+                    type={showPin ? 'text' : 'password'}
+                    value={newPin}
+                    onChange={e => {
+                      setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))
+                      setPinError('')
+                    }}
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="••••••"
+                    className={INPUT_CLASS + ' pr-11 tracking-[0.4em]'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(p => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-dark/35 hover:text-dark transition-colors"
+                  >
+                    {showPin
+                      ? <EyeOff className="w-4 h-4" />
+                      : <Eye className="w-4 h-4" />
+                    }
+                  </button>
+                </div>
+                {pinError && (
+                  <p className="text-[12px] text-red-500 mt-1.5">{pinError}</p>
+                )}
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <button
+                  onClick={handleAddMember}
+                  disabled={savingMember || !newName.trim() || newPin.length !== 6}
+                  className={BTN_PRIMARY}
+                >
+                  {savingMember && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Crear cajero
+                </button>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  disabled={savingMember}
+                  className="w-full text-center text-[13px] text-dark/35 hover:text-dark/60 transition-colors py-1"
+                >
+                  Cancelar
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </>
+      )}
 
     </div>
   )
