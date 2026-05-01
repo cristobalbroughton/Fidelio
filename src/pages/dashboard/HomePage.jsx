@@ -82,7 +82,7 @@ export default function HomePage() {
         if (error) toast.error('Error cargando datos del negocio')
         else {
           setBusiness(data)
-          const dismissed = localStorage.getItem(`fidelio_onboarding_v1_${data?.id}`)
+          const dismissed = localStorage.getItem(`loyia_onboarding_v1_${data?.id}`)
           if (dismissed) setBannerDismissed(true)
         }
         setLB(false)
@@ -210,7 +210,7 @@ export default function HomePage() {
         ]
 
         const handleDismiss = () => {
-          localStorage.setItem(`fidelio_onboarding_v1_${business.id}`, '1')
+          localStorage.setItem(`loyia_onboarding_v1_${business.id}`, '1')
           setBannerDismissed(true)
         }
 
@@ -225,7 +225,7 @@ export default function HomePage() {
             </button>
 
             <p className="text-[13px] font-semibold text-dark/70 mb-4">
-              Bienvenido a Fidelio — empieza en 3 pasos
+              Bienvenido a Loyia — empieza en 3 pasos
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3">

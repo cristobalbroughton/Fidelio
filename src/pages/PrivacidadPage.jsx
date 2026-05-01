@@ -10,7 +10,7 @@ const SECTIONS = [
     body: (
       <>
         <p>
-          Fidelio es operado por Cristóbal Broughton, con domicilio en Chile.
+          Loyia es operado por Cristóbal Broughton, con domicilio en Chile.
         </p>
         <p>
           Contacto:{' '}
@@ -29,7 +29,7 @@ const SECTIONS = [
     title: '¿A quién aplica esta política?',
     body: (
       <p>
-        A los negocios que se registran en Fidelio y a los clientes finales que
+        A los negocios que se registran en Loyia y a los clientes finales que
         participan en programas de fidelización.
       </p>
     ),
@@ -84,7 +84,7 @@ const SECTIONS = [
     body: (
       <>
         <p>
-          Fidelio no vende ni comparte datos personales con terceros con fines
+          Loyia no vende ni comparte datos personales con terceros con fines
           comerciales. Utilizamos los siguientes proveedores:
         </p>
         <ul className="mt-3 space-y-2">
@@ -120,7 +120,7 @@ const SECTIONS = [
     title: 'Seguridad',
     body: (
       <p>
-        Fidelio implementa medidas técnicas para proteger los datos personales,
+        Loyia implementa medidas técnicas para proteger los datos personales,
         incluyendo acceso restringido por roles, conexiones cifradas (HTTPS) y
         autenticación segura.
       </p>
@@ -165,7 +165,7 @@ const SECTIONS = [
     title: 'Modificaciones',
     body: (
       <p>
-        Fidelio se reserva el derecho de actualizar esta política. Los cambios
+        Loyia se reserva el derecho de actualizar esta política. Los cambios
         serán notificados a través de la plataforma con al menos 10 días de
         anticipación.
       </p>
@@ -193,7 +193,7 @@ export default function PrivacidadPage() {
             className="text-primary text-[17px] leading-none tracking-[0.06em]"
             style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
           >
-            Fidelio
+            Loyia
           </span>
           <div className="w-16" /> {/* spacer */}
         </div>
@@ -253,7 +253,7 @@ export default function PrivacidadPage() {
       {/* ── Footer ── */}
       <footer className="border-t border-white/[0.06] py-8">
         <p className="text-center text-white/20 text-xs">
-          © 2026 Fidelio
+          © 2026 Loyia
         </p>
       </footer>
 

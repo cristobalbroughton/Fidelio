@@ -61,7 +61,7 @@ export default function RegisterPage() {
         <div className="w-full max-w-md">
 
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-primary tracking-tight">Fidelio</h1>
+            <h1 className="text-4xl font-bold text-primary tracking-tight">Loyia</h1>
           </div>
 
           <div className="bg-[#1a1a1a] rounded-2xl p-8 border border-white/10 text-center">
@@ -111,7 +111,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
 
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-primary tracking-tight">Fidelio</h1>
+          <h1 className="text-4xl font-bold text-primary tracking-tight">Loyia</h1>
           <p className="text-[#f4f1ea]/50 mt-2 text-sm">Crea tu cuenta</p>
         </div>
 

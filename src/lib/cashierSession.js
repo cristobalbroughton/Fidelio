@@ -1,4 +1,4 @@
-const KEY = 'fidelio_cashier'
+const KEY = 'loyia_cashier'
 
 export const getCashierSession = () => {
   try {

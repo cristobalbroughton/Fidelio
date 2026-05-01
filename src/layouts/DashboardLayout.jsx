@@ -137,7 +137,7 @@ export default function DashboardLayout() {
               className="text-primary text-[20px] leading-none tracking-[0.08em]"
               style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
             >
-              Fidelio
+              Loyia
             </span>
           </Link>
 
@@ -180,7 +180,7 @@ export default function DashboardLayout() {
             className="text-primary text-[20px] leading-none tracking-[0.08em]"
             style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
           >
-            Fidelio
+            Loyia
           </span>
         </Link>
 
@@ -210,7 +210,7 @@ export default function DashboardLayout() {
               className="text-primary text-[22px] leading-none tracking-[0.08em]"
               style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
             >
-              Fidelio
+              Loyia
             </span>
           </Link>
         </div>

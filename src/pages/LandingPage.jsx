@@ -43,7 +43,7 @@ function Navbar() {
             className="text-primary text-[22px] leading-none tracking-[0.08em]"
             style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
           >
-            Fidelio
+            Loyia
           </span>
         </Link>
 
@@ -110,7 +110,7 @@ function PhoneMockup() {
 
         {/* QR card */}
         <div className="bg-white rounded-2xl px-4 py-3 flex flex-col items-center gap-1 mx-1">
-          <QRCodeSVG value="fidelio.cl" size={82} bgColor="#ffffff" fgColor="#0f0f0f" />
+          <QRCodeSVG value="loyia.cl" size={82} bgColor="#ffffff" fgColor="#0f0f0f" />
           <p className="text-[#0f0f0f]/40 text-[10px]">Muestra al vendedor</p>
         </div>
       </div>
@@ -321,7 +321,7 @@ const PLANS = [
     price: '$0',
     period: null,
     desc: 'Para empezar sin riesgo',
-    features: ['Hasta 50 clientes', '2 recompensas', 'Con logo Fidelio', 'Soporte por email'],
+    features: ['Hasta 50 clientes', '2 recompensas', 'Con logo Loyia', 'Soporte por email'],
     cta: 'Empezar gratis',
     highlight: false,
   },
@@ -463,7 +463,7 @@ function Footer() {
             className="text-primary text-[18px] leading-none tracking-[0.08em]"
             style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
           >
-            Fidelio
+            Loyia
           </span>
         </div>
 
@@ -483,7 +483,7 @@ function Footer() {
           </Link>
         </div>
 
-        <p className="text-white/20 text-xs">© 2026 Fidelio · Chile</p>
+        <p className="text-white/20 text-xs">© 2026 Loyia · Chile</p>
       </div>
     </footer>
   )

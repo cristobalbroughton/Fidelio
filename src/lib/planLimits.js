@@ -7,7 +7,7 @@ export const PLAN_LIMITS = {
 const GRACE_DAYS = 5
 
 export const WA_UPGRADE_LINK =
-  `https://wa.me/56912345678?text=${encodeURIComponent('Hola, quiero mejorar mi plan de Fidelio')}`
+  `https://wa.me/56912345678?text=${encodeURIComponent('Hola, quiero mejorar mi plan de Loyia')}`
 
 // Devuelve { plan, isGrace, daysLeft? }
 export function getEffectivePlan(business) {

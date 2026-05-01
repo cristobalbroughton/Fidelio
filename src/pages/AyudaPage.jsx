@@ -57,7 +57,7 @@ const FAQ = [
   },
   {
     q: '¿Hay reembolsos?',
-    a: 'No realizamos reembolsos por períodos no utilizados. Puedes cancelar tu plan en cualquier momento y seguir usando Fidelio hasta el fin del período pagado.',
+    a: 'No realizamos reembolsos por períodos no utilizados. Puedes cancelar tu plan en cualquier momento y seguir usando Loyia hasta el fin del período pagado.',
   },
   {
     q: '¿Cómo elimino mi cuenta?',
@@ -93,7 +93,7 @@ export default function AyudaPage() {
             className="text-primary text-[17px] leading-none tracking-[0.06em]"
             style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
           >
-            Fidelio
+            Loyia
           </span>
           <div className="w-16" />
         </div>
@@ -114,7 +114,7 @@ export default function AyudaPage() {
             Preguntas frecuentes
           </h1>
           <p className="text-white/35 text-sm">
-            Todo lo que necesitas saber para sacarle el máximo a Fidelio.
+            Todo lo que necesitas saber para sacarle el máximo a Loyia.
           </p>
         </div>
 
@@ -187,7 +187,7 @@ export default function AyudaPage() {
 
           <div className="flex flex-col sm:flex-row gap-3">
             <a
-              href="https://wa.me/56981583157?text=Hola%2C%20tengo%20una%20consulta%20sobre%20Fidelio..."
+              href="https://wa.me/56981583157?text=Hola%2C%20tengo%20una%20consulta%20sobre%20Loyia..."
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xl font-semibold text-[14px] text-[#0f0f0f] transition-opacity hover:opacity-85 flex-1"
@@ -198,7 +198,7 @@ export default function AyudaPage() {
             </a>
 
             <a
-              href="mailto:cristobal.broughton@gmail.com?subject=Consulta%20Fidelio"
+              href="mailto:cristobal.broughton@gmail.com?subject=Consulta%20Loyia"
               className="flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xl font-semibold text-[14px] text-[#0f0f0f] transition-opacity hover:opacity-85 flex-1"
               style={{ background: '#c9a84c' }}
             >
@@ -212,7 +212,7 @@ export default function AyudaPage() {
 
       {/* ── Footer ── */}
       <footer className="border-t border-white/[0.06] py-8">
-        <p className="text-center text-white/20 text-xs">© 2026 Fidelio</p>
+        <p className="text-center text-white/20 text-xs">© 2026 Loyia</p>
       </footer>
 
     </div>

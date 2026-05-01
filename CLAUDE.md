@@ -1,8 +1,8 @@
-# Fidelio — Claude Code Context
+# Loyia — Claude Code Context
 
 ## Product
 SaaS de programas de fidelización white-label para negocios locales chilenos.
-- **Dominio:** fidelio.cl
+- **Dominio:** loyia.cl
 - **Primer cliente beta:** Castella (pastelería)
 - **Moneda:** CLP (siempre formatear con `$` y separador de miles punto, ej. $1.500)
 - **Notificaciones:** WhatsApp (no email/push)
@@ -31,15 +31,29 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 
 ## Schema Supabase
 - `businesses`: owner_id, name, slug, category, description, program_name, points_per_clp, welcome_points, primary_color (hex), logo_url (text, nullable), plan (text), last_activity_at (timestamp)
-- `loyalty_customers`: business_id, phone, name, points_balance, visits_count, last_visit_at
-- `transactions`: business_id, customer_id, type (welcome|earn|redeem), points_delta, amount_clp, created_at, reward_id (uuid nullable FK→rewards)
-- `rewards`: business_id, name, description (nullable), points_required, type (product|discount|experience), is_active (boolean, default true)
+- `loyalty_customers`: business_id, phone, name, points_balance, visits_count, last_visit_at, joined_at (timestamp — fecha de registro del cliente; usar este campo para filtros de fecha, NO created_at)
+- `transactions`: business_id, customer_id, type (welcome|earn|redeem), points_delta, amount_clp, created_at, reward_id (uuid nullable FK→rewards), cashier_id (uuid nullable FK→team_members), note (text nullable)
+- `rewards`: business_id, name, description (nullable), points_required, type (product|discount|experience), is_active (boolean, default true) — NO tiene columna deleted_at; para filtrar activas usar `.eq('is_active', true)`
+- `team_members`: business_id, name, pin_hash (bcrypt), is_active (boolean) — tabla del sistema de cajeros Pro
 
 ## Migraciones pendientes / ya aplicadas
 ```sql
 ALTER TABLE transactions ADD COLUMN reward_id uuid REFERENCES rewards(id);
 ALTER TABLE businesses ADD COLUMN logo_url text;
 -- Storage: bucket 'logos' público; policy INSERT auth.uid() IS NOT NULL
+
+-- Sistema de cajeros (plan Pro):
+CREATE TABLE team_members (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id uuid REFERENCES businesses(id),
+  name text NOT NULL,
+  pin_hash text NOT NULL,
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE transactions ADD COLUMN cashier_id uuid REFERENCES team_members(id);
+ALTER TABLE transactions ADD COLUMN note text;
+-- RLS team_members: anon puede SELECT (para login cajero con PIN); pin_hash bcrypt es seguro exponer
 ```
 
 ## Comandos útiles
@@ -100,9 +114,11 @@ ALTER TABLE businesses ADD COLUMN logo_url text;
 ## DashboardLayout — responsive
 - **Mobile (< md):** header superior fijo `h-14` con logo-link + nombre negocio + logout; bottom nav fija con 5 ítems (Inicio/Compra/Clientes/Premios/Config) + íconos + labels cortos; active = `text-primary` + barra `2px` en borde superior
 - **Desktop (md+):** sidebar 240px idéntico al original, sin cambios
-- Logo Fidelio (estrella + texto) es `<Link to="/dashboard">` tanto en header móvil como en sidebar desktop
+- Logo Loyia (estrella + texto) es `<Link to="/dashboard">` tanto en header móvil como en sidebar desktop
 - Padding en páginas móvil: `pb-24 md:pb-8` en el div contenedor raíz de todas las páginas del dashboard
 - Bottom nav soporta safe area iOS: `style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}`
+- Nav items desktop + bottom nav incluyen Analytics (BarChart2) entre Recompensas y Configuración
+- **Layout cajero:** cuando hay sesión de cajero activa, el `<main>` usa `flex justify-center` + `<div className="w-full max-w-xl px-4">` para centrar el contenido de NuevaCompraPage
 
 ## Tablas responsivas (móvil)
 - Patrón: `<div className="md:hidden">` con cards + `<div className="hidden md:block">` con tabla — ambos en el mismo render
@@ -120,3 +136,26 @@ ALTER TABLE businesses ADD COLUMN logo_url text;
 - Vista `phone`: logo circular 64px sobre el nombre, con borde `${accent}40`
 - Vista `panel` header: logo circular 40px junto al programa y saludo del cliente
 - Si `logo_url` es null/undefined: se omite la imagen sin romper el layout
+
+## Sistema de Cajeros (plan Pro)
+- Sesión cajero: objeto `{ type, business_id, business_name, cashier_id, cashier_name, slug }` en `localStorage` clave `loyia_cashier` — gestionado por `src/lib/cashierSession.js` (`setCashierSession`, `getCashierSession`, `clearCashierSession`, `isCashierSession`)
+- Login cajero: tab "Cajero" en LoginPage — busca negocio por slug, carga TODOS los `team_members` (activos e inactivos), compara PIN con bcrypt; si match pero `is_active=false` → error específico "Este cajero está deshabilitado"; si no match → "PIN incorrecto"
+- `ProtectedRoute`: acepta sesión de cajero además de sesión Supabase — redirige a `/login` solo si no hay ninguna de las dos
+- `NuevaCompraPage`: detecta `isCashierSession()` para (1) ocultar empty state educativo, (2) adjuntar `cashier_id` y `note` al INSERT de transacción
+- Toggle activo/inactivo en ConfiguracionPage: implementado con posicionamiento absoluto (`left-0.5` / `left-[18px]`) en vez de `translate-x` para evitar desalineación visual
+
+## AnalyticsPage (`/dashboard/analytics`)
+- Solo accesible para plan Pro — `getEffectivePlan(biz).plan !== 'pro'` redirige a `/dashboard`
+- **Dos useEffects separados:**
+  - `[business?.id]` — queries estáticas (Q5–Q11): mensuales, top clientes, reward perf, at-risk; se ejecutan una sola vez
+  - `[business?.id, period]` — queries de período (Q0–Q4): KPIs, hora pico, día activo; se re-ejecutan al cambiar período
+- **Campos de fecha en `loyalty_customers`:** usar `joined_at` (NO `created_at`) para todos los filtros y agrupamientos de fecha de registro
+- **Q5 (gráfico mensual):** fetch sin filtro de fecha en server; agrupar en JS con `joined_at`; generar array de 12 meses hacia atrás desde hoy; meses sin clientes = 0
+- **Q2/Q3 (clientes nuevos):** count con `joined_at >= periodStart` / `joined_at < periodStart` — NO `created_at`
+- **KPICard** acepta `type: 'clp' | 'pp' | 'count'` para formatear diff:
+  - `clp`: `↑ $X (Y%) vs periodo anterior` / `↓ -$X (-Y%) vs periodo anterior`
+  - `pp`: `↑ Xpp vs periodo anterior`; enteros sin decimal (`100pp` no `100.0pp`)
+  - `count`: `↑ N (Y%) vs periodo anterior`; si `prev === 0`, omitir porcentaje
+- **rewards (Q9):** NO tiene columna `deleted_at` — no usar `.is('deleted_at', null)`; filtrar por `.eq('is_active', true)` si se necesita solo activas
+- Selector de período: PillToggle con opciones 30/60/90 días — solo afecta bloques KPI, hora pico, día activo
+- Bloques estáticos (top clientes, reward perf, at-risk, gráfico mensual) NO cambian con el período

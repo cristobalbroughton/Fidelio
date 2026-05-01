@@ -99,7 +99,7 @@ export default function OnboardingPage() {
 
       await supabase.auth.updateUser({ data: { business_name: form.name } }).catch(() => {})
 
-      toast.success('¡Negocio configurado! Bienvenido a Fidelio.')
+      toast.success('¡Negocio configurado! Bienvenido a Loyia.')
       navigate('/dashboard', { replace: true })
     } catch (err) {
       if (err.code === '23505') {
@@ -122,7 +122,7 @@ export default function OnboardingPage() {
             className="text-primary text-3xl"
             style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
           >
-            Fidelio
+            Loyia
           </p>
           <p className="text-[#f4f1ea]/30 text-sm mt-1.5">
             Configura tu programa de fidelización

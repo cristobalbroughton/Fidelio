@@ -265,7 +265,7 @@ export default function MiniWebAppPage() {
             <p className="text-center text-white/20 text-xs pb-4 pt-8 flex items-center justify-center gap-3 flex-wrap">
               {business.plan === 'free' && (
                 <a href="/" className="hover:text-white/35 transition-colors">
-                  Powered by Fidelio
+                  Powered by Loyia
                 </a>
               )}
               <a href="/privacidad" className="hover:text-white/35 transition-colors">
@@ -576,7 +576,7 @@ export default function MiniWebAppPage() {
             <p className="text-center text-white/15 text-xs pb-4 pt-2 flex items-center justify-center gap-3 flex-wrap">
               {business.plan === 'free' && (
                 <a href="/" className="hover:text-white/25 transition-colors">
-                  Powered by Fidelio
+                  Powered by Loyia
                 </a>
               )}
               <a href="/privacidad" className="hover:text-white/25 transition-colors">

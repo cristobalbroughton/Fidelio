@@ -401,7 +401,7 @@ export default function ConfiguracionPage() {
           <p className="text-[12px] text-dark/40 mt-1.5">
             URL:{' '}
             <span className="text-dark/60 font-medium">
-              fidelio.cl/c/<span className="text-primary">{s1.slug || '...'}</span>
+              loyia.cl/c/<span className="text-primary">{s1.slug || '...'}</span>
             </span>
           </p>
         </div>

@@ -9,7 +9,7 @@ const SECTIONS = [
     title: 'Aceptación de los términos',
     body: (
       <p>
-        Al crear una cuenta en Fidelio, el negocio (en adelante &quot;el
+        Al crear una cuenta en Loyia, el negocio (en adelante &quot;el
         Usuario&quot;) acepta expresamente estos Términos de Uso. Si no estás
         de acuerdo con alguno de estos términos, no debes usar la plataforma.
       </p>
@@ -20,9 +20,9 @@ const SECTIONS = [
     title: 'Descripción del servicio',
     body: (
       <p>
-        Fidelio es una plataforma de programas de fidelización que permite a
+        Loyia es una plataforma de programas de fidelización que permite a
         negocios gestionar puntos y recompensas para sus clientes. El servicio
-        se presta a través de fidelio-pied.vercel.app y sus subdominios.
+        se presta a través de loyia.vercel.app y sus subdominios.
       </p>
     ),
   },
@@ -31,7 +31,7 @@ const SECTIONS = [
     title: 'Planes y pagos',
     body: (
       <p>
-        Fidelio ofrece un plan gratuito (Free) y planes de pago (Starter y
+        Loyia ofrece un plan gratuito (Free) y planes de pago (Starter y
         Pro). Los planes de pago se facturan mensualmente. En caso de no pago,
         el Usuario tendrá un período de gracia de 5 días hábiles, tras el cual
         la cuenta será degradada automáticamente al plan Free. No se realizan
@@ -44,7 +44,7 @@ const SECTIONS = [
     title: 'Cambios de precio y funcionalidades',
     body: (
       <p>
-        Fidelio se reserva el derecho de modificar los precios y
+        Loyia se reserva el derecho de modificar los precios y
         funcionalidades de los planes con un aviso mínimo de 30 días a través
         de la plataforma o por correo electrónico. El uso continuado del
         servicio tras ese plazo implica aceptación de los cambios.
@@ -57,14 +57,14 @@ const SECTIONS = [
     body: (
       <>
         <p className="mb-3">
-          El Usuario se compromete a no usar Fidelio para:
+          El Usuario se compromete a no usar Loyia para:
         </p>
         <ul className="space-y-2">
           {[
             'Actividades ilegales o fraudulentas',
             'Enviar spam o contactar clientes sin su consentimiento',
             'Revender o sublicenciar el acceso a la plataforma',
-            'Copiar, replicar o crear productos derivados de Fidelio',
+            'Copiar, replicar o crear productos derivados de Loyia',
             'Ingresar datos falsos o fraudulentos de clientes',
             'Acosar, intimidar o contactar clientes de forma no autorizada',
             'Intentar acceder a cuentas de otros negocios',
@@ -89,7 +89,7 @@ const SECTIONS = [
     body: (
       <>
         <p className="mb-3">
-          Fidelio presta el servicio en las condiciones disponibles. No nos
+          Loyia presta el servicio en las condiciones disponibles. No nos
           hacemos responsables por:
         </p>
         <ul className="space-y-2 mb-4">
@@ -120,10 +120,10 @@ const SECTIONS = [
     title: 'Propiedad intelectual',
     body: (
       <p>
-        El código, diseño, marca y contenidos de Fidelio son propiedad
+        El código, diseño, marca y contenidos de Loyia son propiedad
         exclusiva de Cristóbal Broughton. El Usuario conserva la propiedad de
         su logo, nombre y contenidos propios que suba a la plataforma. Ninguna
-        parte de Fidelio puede ser copiada, reproducida o utilizada sin
+        parte de Loyia puede ser copiada, reproducida o utilizada sin
         autorización expresa.
       </p>
     ),
@@ -163,7 +163,7 @@ const SECTIONS = [
     title: 'Modificaciones a estos términos',
     body: (
       <p>
-        Fidelio se reserva el derecho de modificar estos términos con un aviso
+        Loyia se reserva el derecho de modificar estos términos con un aviso
         mínimo de 30 días. El uso continuado de la plataforma tras ese plazo
         implica aceptación de los nuevos términos.
       </p>
@@ -191,7 +191,7 @@ export default function TerminosPage() {
             className="text-primary text-[17px] leading-none tracking-[0.06em]"
             style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
           >
-            Fidelio
+            Loyia
           </span>
           <div className="w-16" />
         </div>
@@ -248,7 +248,7 @@ export default function TerminosPage() {
       {/* ── Footer ── */}
       <footer className="border-t border-white/[0.06] py-8">
         <p className="text-center text-white/20 text-xs">
-          © 2026 Fidelio
+          © 2026 Loyia
         </p>
       </footer>
 
