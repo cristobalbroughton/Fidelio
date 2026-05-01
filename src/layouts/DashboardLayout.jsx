@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   HelpCircle,
+  BarChart2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
@@ -63,6 +64,7 @@ const NAV_ITEMS = [
   { to: '/dashboard/nueva-compra',       icon: PlusCircle,      label: 'Nueva Compra',   end: false },
   { to: '/dashboard/clientes',           icon: Users,           label: 'Clientes',       end: false },
   { to: '/dashboard/recompensas',        icon: Gift,            label: 'Recompensas',    end: false },
+  { to: '/dashboard/analytics',          icon: BarChart2,       label: 'Analytics',      end: false },
   { to: '/dashboard/configuracion',      icon: Settings,        label: 'Configuración',  end: false },
 ]
 
@@ -72,6 +74,7 @@ const BOTTOM_NAV = [
   { to: '/dashboard/nueva-compra',       icon: PlusCircle,      label: 'Compra',    end: false },
   { to: '/dashboard/clientes',           icon: Users,           label: 'Clientes',  end: false },
   { to: '/dashboard/recompensas',        icon: Gift,            label: 'Premios',   end: false },
+  { to: '/dashboard/analytics',          icon: BarChart2,       label: 'Analytics', end: false },
   { to: '/dashboard/configuracion',      icon: Settings,        label: 'Config',    end: false },
   { to: '/ayuda',                        icon: HelpCircle,      label: 'Ayuda',     end: false },
 ]

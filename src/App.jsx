@@ -17,6 +17,7 @@ import RecompensasPage from './pages/dashboard/RecompensasPage'
 import MiniWebAppPage from './pages/MiniWebAppPage'
 import AdminPage from './pages/AdminPage'
 import ConfiguracionPage from './pages/dashboard/ConfiguracionPage'
+import AnalyticsPage from './pages/dashboard/AnalyticsPage'
 import LandingPage from './pages/LandingPage'
 import PrivacidadPage from './pages/PrivacidadPage'
 import TerminosPage from './pages/TerminosPage'
@@ -71,6 +72,7 @@ export default function App() {
               <Route path="clientes"        element={<ClientesPage />} />
               <Route path="recompensas"     element={<RecompensasPage />} />
               <Route path="configuracion"   element={<ConfiguracionPage />} />
+              <Route path="analytics"       element={<AnalyticsPage />} />
             </Route>
 
             {/* Admin — protegida, con DashboardLayout */}
