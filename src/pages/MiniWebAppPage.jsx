@@ -51,6 +51,7 @@ export default function MiniWebAppPage() {
           .select('id, name, description, points_required, type')
           .eq('business_id', data.id)
           .eq('is_active', true)
+          .is('deleted_at', null)
           .order('points_required', { ascending: true })
           .then(({ data: rData }) => setRewards(rData ?? []))
         setView('phone')
@@ -143,15 +144,20 @@ export default function MiniWebAppPage() {
   }
 
   const handleToggleHistory = async () => {
-    if (!customer?.id) return
+    if (!customer?.id || !business?.id) return
     if (!showHistory && !historyLoaded) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('transactions')
         .select('type, points_delta, created_at, rewards(name)')
         .eq('customer_id', customer.id)
         .eq('business_id', business.id)
         .order('created_at', { ascending: false })
         .limit(5)
+      if (error) {
+        console.error('[history] query error:', error)
+        toast.error('Error cargando historial')
+        return
+      }
       setHistory(data ?? [])
       setHistoryLoaded(true)
     }
