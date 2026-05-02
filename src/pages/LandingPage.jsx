@@ -51,7 +51,7 @@ function Navbar() {
         <div className="flex items-center gap-3">
           <Link
             to="/login"
-            className="hidden sm:inline-flex text-white/55 hover:text-white/80 text-sm font-medium transition-colors px-3 py-2"
+            className="text-white/55 hover:text-white/80 text-xs sm:text-sm font-medium transition-colors px-2 sm:px-3 py-2"
           >
             Iniciar sesión
           </Link>
