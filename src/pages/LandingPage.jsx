@@ -144,7 +144,7 @@ function Hero() {
           </h1>
 
           <p className="text-white/55 text-lg leading-relaxed max-w-md">
-            Sin app que descargar. Sin complicaciones. Solo puntos por WhatsApp.
+            Sin app que descargar. Sin complicaciones. Solo escanea y acumula.
           </p>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-2">
