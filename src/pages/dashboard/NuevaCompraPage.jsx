@@ -256,6 +256,7 @@ export default function NuevaCompraPage() {
           points_balance: customer.points_balance + points,
           visits_count: customer.visits_count + 1,
           last_visit_at: new Date().toISOString(),
+          total_spent_clp: (customer.total_spent_clp ?? 0) + amountRaw,
         })
         .eq('id', customer.id)
 
@@ -829,7 +830,7 @@ function QrScannerModal({ business, onClose, onFound }) {
   const queryCustomer = async (uuid) => {
     const { data, error } = await supabase
       .from('loyalty_customers')
-      .select('id, phone, name, points_balance, visits_count, last_visit_at')
+      .select('id, phone, name, points_balance, visits_count, last_visit_at, total_spent_clp')
       .eq('id', uuid)
       .eq('business_id', business.id)
       .maybeSingle()

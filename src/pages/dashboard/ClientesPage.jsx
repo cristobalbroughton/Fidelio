@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Loader2, Search, Star, X, Users } from 'lucide-react'
+import { Loader2, Search, Star, X, Users, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -50,6 +50,9 @@ export default function ClientesPage() {
   // Búsqueda
   const [search, setSearch]               = useState('')
 
+  // Exportar CSV
+  const [exporting, setExporting] = useState(false)
+
   // Drawer
   const [drawerCustomer, setDrawerCustomer] = useState(null)
   const [drawerTxs, setDrawerTxs]           = useState([])
@@ -62,7 +65,7 @@ export default function ClientesPage() {
     if (!user?.id) return
     supabase
       .from('businesses')
-      .select('id, name, points_per_clp, welcome_points, slug')
+      .select('id, name, points_per_clp, welcome_points, slug, plan')
       .eq('owner_id', user.id)
       .single()
       .then(({ data, error }) => {
@@ -131,6 +134,59 @@ export default function ClientesPage() {
     setTimeout(() => { setDrawerCustomer(null); setDrawerTxs([]) }, 300)
   }
 
+  // ── Exportar CSV ────────────────────────────────────────────────────────────
+
+  const handleExportCSV = async () => {
+    if (exporting) return
+    setExporting(true)
+    try {
+      const { data, error } = await supabase
+        .from('loyalty_customers')
+        .select('name, phone, points_balance, visits_count, joined_at, last_visit_at')
+        .eq('business_id', business.id)
+        .order('points_balance', { ascending: false })
+
+      if (error) throw error
+      if (!data || data.length === 0) {
+        toast('No hay clientes para exportar')
+        return
+      }
+
+      const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '/') : ''
+
+      const headers = ['Nombre', 'Teléfono', 'Puntos', 'Total Gastado (CLP)', 'Visitas', 'Fecha Registro', 'Última Visita']
+      const rows = data.map(c => [
+        c.name ?? '',
+        c.phone ?? '',
+        c.points_balance ?? 0,
+        spendMap[c.id] ?? 0,
+        c.visits_count ?? 0,
+        fmtDate(c.joined_at),
+        fmtDate(c.last_visit_at),
+      ])
+
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\r\n')
+
+      const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const today = new Date()
+      const dd = String(today.getDate()).padStart(2, '0')
+      const mm = String(today.getMonth() + 1).padStart(2, '0')
+      const yyyy = today.getFullYear()
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `clientes-${business.slug}-${dd}-${mm}-${yyyy}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Error al exportar clientes')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   // ── Derivados ───────────────────────────────────────────────────────────────
 
   const filtered = customers.filter(c => {
@@ -177,6 +233,17 @@ export default function ClientesPage() {
               : 'Gestiona tu base de clientes'}
           </p>
         </div>
+
+        {business.plan === 'pro' && (
+          <button
+            onClick={handleExportCSV}
+            disabled={exporting || loadingList}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-primary/40 text-primary text-[13px] font-semibold hover:bg-primary/[0.06] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Exportar CSV
+          </button>
+        )}
       </div>
 
       {/* Buscador */}
