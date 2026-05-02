@@ -142,7 +142,7 @@ export default function ClientesPage() {
     try {
       const { data, error } = await supabase
         .from('loyalty_customers')
-        .select('name, phone, points_balance, visits_count, joined_at, last_visit_at')
+        .select('name, phone, points_balance, total_spent_clp, visits_count, joined_at, last_visit_at')
         .eq('business_id', business.id)
         .order('points_balance', { ascending: false })
 
@@ -159,7 +159,7 @@ export default function ClientesPage() {
         c.name ?? '',
         c.phone ?? '',
         c.points_balance ?? 0,
-        spendMap[c.id] ?? 0,
+        c.total_spent_clp ?? 0,
         c.visits_count ?? 0,
         fmtDate(c.joined_at),
         fmtDate(c.last_visit_at),
