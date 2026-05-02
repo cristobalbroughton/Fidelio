@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Loader2, Image as ImageIcon, Lock, Eye, EyeOff, UserPlus, X } from 'lucide-react'
+import { Loader2, Image as ImageIcon, Lock, Eye, EyeOff, UserPlus, X, Download, Copy, Check } from 'lucide-react'
+import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react'
 import { format, parseISO } from 'date-fns'
 import bcrypt from 'bcryptjs'
 import toast from 'react-hot-toast'
@@ -50,6 +51,10 @@ export default function ConfiguracionPage() {
   const [savingMember, setSavingMember] = useState(false)
   const [pinError, setPinError]       = useState('')
 
+  // Sección QR
+  const [copied, setCopied]           = useState(false)
+  const qrDownloadRef                 = useRef(null)
+
   // ── Carga inicial ──────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -78,6 +83,32 @@ export default function ConfiguracionPage() {
         setLoading(false)
       })
   }, [user?.id])
+
+  // ── QR handlers ───────────────────────────────────────────────────────────
+
+  const handleDownloadQR = () => {
+    const src = qrDownloadRef.current?.querySelector('canvas')
+    if (!src) return
+    const PAD = 40
+    const SIZE = 1000
+    const dst = document.createElement('canvas')
+    dst.width = SIZE
+    dst.height = SIZE
+    const ctx = dst.getContext('2d')
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, SIZE, SIZE)
+    ctx.drawImage(src, PAD, PAD, SIZE - PAD * 2, SIZE - PAD * 2)
+    const a = document.createElement('a')
+    a.href = dst.toDataURL('image/png')
+    a.download = `qr-${business.slug}.png`
+    a.click()
+  }
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(`https://loyia.cl/c/${business.slug}`)
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+      .catch(() => toast.error('No se pudo copiar'))
+  }
 
   // ── handleSaveS1 ──────────────────────────────────────────────────────────
 
@@ -262,7 +293,10 @@ export default function ConfiguracionPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 items-start">
+
+      {/* ── Col 1: Tu negocio + QR ───────────────────────────────────────── */}
+      <div className="space-y-6">
 
       {/* ── Sección 1 — Tu negocio ─────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm p-6 space-y-5">
@@ -412,6 +446,83 @@ export default function ConfiguracionPage() {
         </button>
       </div>
 
+      {/* ── QR de tu negocio ─────────────────────────────────────────────── */}
+      {business.slug && (
+        <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm p-6">
+
+          <div>
+            <h2 className="text-[15px] font-semibold text-dark">QR de tu negocio</h2>
+            <p className="text-[13px] text-dark/40 mt-0.5">
+              Descarga e imprime para que tus clientes escaneen y accedan a tu programa.
+            </p>
+          </div>
+
+          <div className="h-px bg-black/[0.05] my-5" />
+
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+
+            {/* QR visual */}
+            <div className="shrink-0 p-4 rounded-2xl border border-black/[0.06] bg-white shadow-sm">
+              <QRCodeSVG
+                value={`https://loyia.cl/c/${business.slug}`}
+                size={160}
+                bgColor="#ffffff"
+                fgColor="#0f0f0f"
+                level="M"
+              />
+            </div>
+
+            {/* Info + actions */}
+            <div className="flex-1 flex flex-col gap-4 w-full">
+
+              <div>
+                <p className={LABEL_CLASS}>Link de tu negocio</p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-[13px] text-dark/65 font-mono bg-dark/[0.03] border border-black/[0.05] px-3 py-2 rounded-lg flex-1 truncate">
+                    loyia.cl/c/{business.slug}
+                  </span>
+                  <button
+                    onClick={handleCopyLink}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium border border-black/[0.08] text-dark/55 hover:bg-dark/[0.04] transition-colors"
+                  >
+                    {copied
+                      ? <><Check className="w-4 h-4 text-emerald-500" /><span className="text-emerald-600">Copiado</span></>
+                      : <><Copy className="w-4 h-4" />Copiar</>
+                    }
+                  </button>
+                </div>
+              </div>
+
+              <button onClick={handleDownloadQR} className={BTN_PRIMARY}>
+                <Download className="w-4 h-4" />
+                Descargar QR (PNG)
+              </button>
+
+              <p className="text-[11px] text-dark/30 leading-relaxed -mt-1">
+                Imagen 1000×1000 px con margen blanco, lista para imprimir.
+              </p>
+            </div>
+          </div>
+
+          {/* Hidden high-res canvas used only for download */}
+          <div ref={qrDownloadRef} className="hidden">
+            <QRCodeCanvas
+              value={`https://loyia.cl/c/${business.slug}`}
+              size={920}
+              bgColor="#ffffff"
+              fgColor="#0f0f0f"
+              level="M"
+            />
+          </div>
+
+        </div>
+      )}
+
+      </div>{/* end col 1 */}
+
+      {/* ── Col 2: Programa de puntos + Equipo ───────────────────────────── */}
+      <div className="flex flex-col gap-6">
+
       {/* ── Sección 2 — Programa de puntos ────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm p-6 space-y-5">
 
@@ -503,11 +614,9 @@ export default function ConfiguracionPage() {
         </button>
       </div>
 
-      </div>{/* end grid */}
-
-      {/* ── Sección 3 — Equipo (Pro only) ──────────────────────────────── */}
+      {/* ── Equipo ─────────────────────────────────────────────────────── */}
       {business.plan === 'pro' && (
-        <div className="mt-6 bg-white rounded-2xl border border-black/[0.05] shadow-sm p-6 space-y-5">
+        <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm p-6 space-y-5">
 
           <div className="flex items-start justify-between">
             <div>
@@ -572,6 +681,10 @@ export default function ConfiguracionPage() {
 
         </div>
       )}
+
+      </div>{/* end col 2 */}
+
+      </div>{/* end grid */}
 
       {/* ── Modal: Agregar cajero ───────────────────────────────────────── */}
       {showAddModal && (

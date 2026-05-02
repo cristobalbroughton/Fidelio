@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   HelpCircle,
   BarChart2,
+  Lock,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
@@ -64,7 +65,7 @@ const NAV_ITEMS = [
   { to: '/dashboard/nueva-compra',       icon: PlusCircle,      label: 'Nueva Compra',   end: false },
   { to: '/dashboard/clientes',           icon: Users,           label: 'Clientes',       end: false },
   { to: '/dashboard/recompensas',        icon: Gift,            label: 'Recompensas',    end: false },
-  { to: '/dashboard/analytics',          icon: BarChart2,       label: 'Analytics',      end: false },
+  { to: '/dashboard/analytics',          icon: BarChart2,       label: 'Analytics',      end: false, proOnly: true },
   { to: '/dashboard/configuracion',      icon: Settings,        label: 'Configuración',  end: false },
 ]
 
@@ -74,7 +75,7 @@ const BOTTOM_NAV = [
   { to: '/dashboard/nueva-compra',       icon: PlusCircle,      label: 'Compra',    end: false },
   { to: '/dashboard/clientes',           icon: Users,           label: 'Clientes',  end: false },
   { to: '/dashboard/recompensas',        icon: Gift,            label: 'Premios',   end: false },
-  { to: '/dashboard/analytics',          icon: BarChart2,       label: 'Analytics', end: false },
+  { to: '/dashboard/analytics',          icon: BarChart2,       label: 'Analytics', end: false, proOnly: true },
   { to: '/dashboard/configuracion',      icon: Settings,        label: 'Config',    end: false },
   { to: '/ayuda',                        icon: HelpCircle,      label: 'Ayuda',     end: false },
 ]
@@ -113,6 +114,15 @@ export default function DashboardLayout() {
         setPlanStatus({ effective, customerCount: count, maxCustomers })
       })
   }, [user?.id])
+
+  const isPro = planStatus?.effective?.plan === 'pro'
+
+  const handleAnalyticsLocked = () => {
+    toast('Analytics avanzado es exclusivo del plan Pro. Actualiza tu plan para ver tus métricas completas.', {
+      icon: '🔒',
+      duration: 4000,
+    })
+  }
 
   const handleLogout = async () => {
     try {
@@ -225,38 +235,53 @@ export default function DashboardLayout() {
 
         {/* Navigation */}
         <nav className="flex-1 px-2.5 space-y-0.5 overflow-y-auto">
-          {NAV_ITEMS.map(({ to, icon: Icon, label, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                [
-                  'group relative flex items-center gap-3 px-3 rounded-lg text-[13.5px] font-medium',
-                  'transition-all duration-150 select-none min-h-[42px]',
-                  isActive
-                    ? 'text-primary bg-primary/[0.08]'
-                    : 'text-white/45 hover:text-white/80 hover:bg-white/[0.04]',
-                ].join(' ')
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {isActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-primary" />
-                  )}
-                  <Icon
-                    className={[
-                      'w-[17px] h-[17px] shrink-0 transition-colors duration-150',
-                      isActive ? 'text-primary' : 'text-white/35 group-hover:text-white/65',
-                    ].join(' ')}
-                    strokeWidth={isActive ? 2.1 : 1.8}
-                  />
-                  {label}
-                </>
-              )}
-            </NavLink>
-          ))}
+          {NAV_ITEMS.map(({ to, icon: Icon, label, end, proOnly }) => {
+            if (proOnly && !isPro) {
+              return (
+                <button
+                  key={to}
+                  onClick={handleAnalyticsLocked}
+                  className="group relative flex items-center gap-3 px-3 rounded-lg text-[13.5px] font-medium transition-all duration-150 select-none min-h-[42px] w-full text-left text-white/30 hover:bg-white/[0.04] cursor-pointer"
+                >
+                  <Icon className="w-[17px] h-[17px] shrink-0 text-white/20" strokeWidth={1.8} />
+                  <span className="flex-1">{label}</span>
+                  <Lock className="w-[13px] h-[13px] text-white/20 shrink-0" strokeWidth={1.8} />
+                </button>
+              )
+            }
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) =>
+                  [
+                    'group relative flex items-center gap-3 px-3 rounded-lg text-[13.5px] font-medium',
+                    'transition-all duration-150 select-none min-h-[42px]',
+                    isActive
+                      ? 'text-primary bg-primary/[0.08]'
+                      : 'text-white/45 hover:text-white/80 hover:bg-white/[0.04]',
+                  ].join(' ')
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-primary" />
+                    )}
+                    <Icon
+                      className={[
+                        'w-[17px] h-[17px] shrink-0 transition-colors duration-150',
+                        isActive ? 'text-primary' : 'text-white/35 group-hover:text-white/65',
+                      ].join(' ')}
+                      strokeWidth={isActive ? 2.1 : 1.8}
+                    />
+                    {label}
+                  </>
+                )}
+              </NavLink>
+            )
+          })}
 
           {/* Admin link — solo visible para el superadmin */}
           {user?.email === import.meta.env.VITE_ADMIN_EMAIL && (
@@ -374,29 +399,44 @@ export default function DashboardLayout() {
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         <div className="flex items-stretch">
-          {BOTTOM_NAV.map(({ to, icon: Icon, label, end }) => (
-            <NavLink key={to} to={to} end={end} className="flex-1">
-              {({ isActive }) => (
-                <div
-                  className={[
-                    'flex flex-col items-center justify-center gap-1 py-2.5 transition-colors duration-150 relative',
-                    isActive ? 'text-primary' : 'text-white/30',
-                  ].join(' ')}
-                >
-                  {isActive && (
-                    <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full bg-primary" />
-                  )}
-                  <Icon
-                    className="w-5 h-5 shrink-0"
-                    strokeWidth={isActive ? 2.1 : 1.7}
-                  />
-                  <span className="text-[10px] font-medium leading-none tracking-wide">
-                    {label}
-                  </span>
-                </div>
-              )}
-            </NavLink>
-          ))}
+          {BOTTOM_NAV.map(({ to, icon: Icon, label, end, proOnly }) => {
+            if (proOnly && !isPro) {
+              return (
+                <button key={to} className="flex-1" onClick={handleAnalyticsLocked}>
+                  <div className="flex flex-col items-center justify-center gap-1 py-2.5 relative text-white/20">
+                    <Icon className="w-5 h-5 shrink-0" strokeWidth={1.7} />
+                    <span className="text-[10px] font-medium leading-none tracking-wide flex items-center gap-0.5">
+                      {label}
+                      <Lock className="w-[9px] h-[9px] shrink-0" strokeWidth={2} />
+                    </span>
+                  </div>
+                </button>
+              )
+            }
+            return (
+              <NavLink key={to} to={to} end={end} className="flex-1">
+                {({ isActive }) => (
+                  <div
+                    className={[
+                      'flex flex-col items-center justify-center gap-1 py-2.5 transition-colors duration-150 relative',
+                      isActive ? 'text-primary' : 'text-white/30',
+                    ].join(' ')}
+                  >
+                    {isActive && (
+                      <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full bg-primary" />
+                    )}
+                    <Icon
+                      className="w-5 h-5 shrink-0"
+                      strokeWidth={isActive ? 2.1 : 1.7}
+                    />
+                    <span className="text-[10px] font-medium leading-none tracking-wide">
+                      {label}
+                    </span>
+                  </div>
+                )}
+              </NavLink>
+            )
+          })}
         </div>
       </nav>
 
