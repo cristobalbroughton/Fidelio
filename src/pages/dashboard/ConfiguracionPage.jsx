@@ -32,7 +32,7 @@ export default function ConfiguracionPage() {
   const [loading, setLoading]         = useState(true)
 
   // Sección 1 — Tu negocio
-  const [s1, setS1]                   = useState({ name: '', category: '', description: '', slug: '' })
+  const [s1, setS1]                   = useState({ name: '', category: '', slug: '' })
   const [logoFile, setLogoFile]       = useState(null)
   const [logoPreview, setLogoPreview] = useState(null)
   const [savingS1, setSavingS1]       = useState(false)
@@ -61,17 +61,16 @@ export default function ConfiguracionPage() {
     if (!user?.id) return
     supabase
       .from('businesses')
-      .select('id, name, category, description, slug, logo_url, program_name, points_per_clp, welcome_points, primary_color, plan')
+      .select('id, name, category, slug, logo_url, program_name, points_per_clp, welcome_points, primary_color, plan')
       .eq('owner_id', user.id)
       .single()
       .then(({ data, error }) => {
         if (error) { toast.error('Error cargando configuración'); return }
         setBusiness(data)
         setS1({
-          name:        data.name        ?? '',
-          category:    data.category    ?? '',
-          description: data.description ?? '',
-          slug:        data.slug        ?? '',
+          name:        data.name     ?? '',
+          category:    data.category ?? '',
+          slug:        data.slug     ?? '',
         })
         setS2({
           program_name:  data.program_name  ?? '',
@@ -145,10 +144,9 @@ export default function ConfiguracionPage() {
       const { error } = await supabase
         .from('businesses')
         .update({
-          name:        s1.name.trim(),
-          category:    s1.category,
-          description: s1.description.trim() || null,
-          slug:        s1.slug.trim(),
+          name:     s1.name.trim(),
+          category: s1.category,
+          slug:     s1.slug.trim(),
           logo_url,
         })
         .eq('id', business.id)
@@ -406,19 +404,6 @@ export default function ConfiguracionPage() {
           </select>
         </div>
 
-        {/* Descripción */}
-        <div>
-          <label className={LABEL_CLASS}>
-            Descripción <span className="text-dark/25 font-normal">(opcional)</span>
-          </label>
-          <textarea
-            value={s1.description}
-            onChange={e => setS1(f => ({ ...f, description: e.target.value }))}
-            placeholder="Describe brevemente tu negocio..."
-            rows={3}
-            className={INPUT_CLASS + ' resize-none'}
-          />
-        </div>
 
         {/* Slug */}
         <div>
