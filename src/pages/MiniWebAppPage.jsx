@@ -38,24 +38,28 @@ export default function MiniWebAppPage() {
   // ── Carga negocio ───────────────────────────────────────────────────────────
 
   useEffect(() => {
-    supabase
-      .from('businesses')
-      .select('id, name, slug, program_name, points_per_clp, welcome_points, primary_color, logo_url, plan, pro_expires_at')
-      .eq('slug', slug)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) { setView('not_found'); return }
-        setBusiness(data)
+    const init = async () => {
+      const { data: bizData, error } = await supabase
+        .from('businesses')
+        .select('id, name, slug, program_name, points_per_clp, welcome_points, primary_color, logo_url, plan, pro_expires_at')
+        .eq('slug', slug)
+        .single()
+      if (error || !bizData) { setView('not_found'); return }
+      setBusiness(bizData)
+      setView('phone')
+
+      const [{ data: rData }] = await Promise.all([
         supabase
           .from('rewards')
           .select('id, name, description, points_required, type')
-          .eq('business_id', data.id)
+          .eq('business_id', bizData.id)
           .eq('is_active', true)
           .is('deleted_at', null)
-          .order('points_required', { ascending: true })
-          .then(({ data: rData }) => setRewards(rData ?? []))
-        setView('phone')
-      })
+          .order('points_required', { ascending: true }),
+      ])
+      setRewards(rData ?? [])
+    }
+    init()
   }, [slug])
 
   // ── Handlers ────────────────────────────────────────────────────────────────

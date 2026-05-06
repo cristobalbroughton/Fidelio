@@ -4,9 +4,9 @@ import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react'
 import { format, parseISO } from 'date-fns'
 import bcrypt from 'bcryptjs'
 import toast from 'react-hot-toast'
-import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { INPUT_CLASS, LABEL_CLASS } from '../../lib/utils'
+import { useBusinessContext } from '../../contexts/BusinessContext'
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
 
@@ -26,10 +26,7 @@ const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ConfiguracionPage() {
-  const { user } = useAuth()
-
-  const [business, setBusiness]       = useState(null)
-  const [loading, setLoading]         = useState(true)
+  const { business, loadingBusiness, updateBusiness } = useBusinessContext()
 
   // Sección 1 — Tu negocio
   const [s1, setS1]                   = useState({ name: '', category: '', slug: '' })
@@ -55,33 +52,23 @@ export default function ConfiguracionPage() {
   const [copied, setCopied]           = useState(false)
   const qrDownloadRef                 = useRef(null)
 
-  // ── Carga inicial ──────────────────────────────────────────────────────────
+  // ── Inicializar formularios cuando business carga ─────────────────────────
 
   useEffect(() => {
-    if (!user?.id) return
-    supabase
-      .from('businesses')
-      .select('id, name, category, slug, logo_url, program_name, points_per_clp, welcome_points, primary_color, plan')
-      .eq('owner_id', user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (error) { toast.error('Error cargando configuración'); return }
-        setBusiness(data)
-        setS1({
-          name:        data.name     ?? '',
-          category:    data.category ?? '',
-          slug:        data.slug     ?? '',
-        })
-        setS2({
-          program_name:  data.program_name  ?? '',
-          points_per_clp: String(data.points_per_clp ?? ''),
-          welcome_points: String(data.welcome_points ?? ''),
-          primary_color:  data.primary_color ?? '#c9a84c',
-        })
-        setLogoPreview(data.logo_url ?? null)
-        setLoading(false)
-      })
-  }, [user?.id])
+    if (!business) return
+    setS1({
+      name:     business.name     ?? '',
+      category: business.category ?? '',
+      slug:     business.slug     ?? '',
+    })
+    setS2({
+      program_name:   business.program_name   ?? '',
+      points_per_clp: String(business.points_per_clp ?? ''),
+      welcome_points: String(business.welcome_points ?? ''),
+      primary_color:  business.primary_color  ?? '#c9a84c',
+    })
+    setLogoPreview(business.logo_url ?? null)
+  }, [business?.id])
 
   // ── QR handlers ───────────────────────────────────────────────────────────
 
@@ -152,7 +139,7 @@ export default function ConfiguracionPage() {
         .eq('id', business.id)
       if (error) throw error
 
-      setBusiness(b => ({ ...b, ...s1, logo_url }))
+      updateBusiness({ ...s1, logo_url })
       setLogoFile(null)
       if (logo_url) setLogoPreview(logo_url)
       toast.success('Cambios guardados')
@@ -183,7 +170,7 @@ export default function ConfiguracionPage() {
         })
         .eq('id', business.id)
       if (error) throw error
-      setBusiness(b => ({ ...b, program_name: s2.program_name, points_per_clp: ppc, welcome_points: wp, primary_color: s2.primary_color }))
+      updateBusiness({ program_name: s2.program_name.trim(), points_per_clp: ppc, welcome_points: wp, primary_color: s2.primary_color })
       toast.success('Cambios guardados')
     } catch (err) {
       toast.error(err.message ?? 'Error al guardar')
@@ -257,7 +244,7 @@ export default function ConfiguracionPage() {
 
   // ── Guards ─────────────────────────────────────────────────────────────────
 
-  if (loading) {
+  if (loadingBusiness) {
     return (
       <div className="p-8 lg:p-10 flex items-center justify-center min-h-[300px]">
         <Loader2 className="w-6 h-6 text-primary animate-spin" />

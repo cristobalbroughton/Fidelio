@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useEffect } from 'react'
 import { NavLink, Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -16,10 +16,10 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
+import { BusinessProvider, useBusinessContext } from '../contexts/BusinessContext'
 import {
   WA_UPGRADE_LINK,
-  getEffectivePlan, getPlanLimits, getUpgradeMessage,
+  getUpgradeMessage,
 } from '../lib/planLimits'
 import { getCashierSession, clearCashierSession, isCashierSession } from '../lib/cashierSession'
 
@@ -80,40 +80,17 @@ const BOTTOM_NAV = [
   { to: '/ayuda',                        icon: HelpCircle,      label: 'Ayuda',     end: false },
 ]
 
-export default function DashboardLayout() {
+// ── Inner layout (requires BusinessContext) ───────────────────────────────────
+
+function DashboardLayoutInner() {
+  const { planStatus } = useBusinessContext()
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
 
   const businessName =
     user?.user_metadata?.business_name ??
     user?.email?.split('@')[0] ??
     'Mi Negocio'
-
-  const [planStatus, setPlanStatus] = useState(null)
-
-  // Redirect cashiers away from non-purchase routes
-  useEffect(() => {
-    if (isCashierSession() && location.pathname !== '/dashboard/nueva-compra') {
-      navigate('/dashboard/nueva-compra', { replace: true })
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!user?.id) return
-    supabase
-      .from('businesses')
-      .select('id, plan, pro_expires_at, loyalty_customers(count)')
-      .eq('owner_id', user.id)
-      .single()
-      .then(({ data: biz, error }) => {
-        if (error || !biz) return
-        const count = biz.loyalty_customers?.[0]?.count ?? 0
-        const effective = getEffectivePlan(biz)
-        const { maxCustomers } = getPlanLimits(effective.plan)
-        setPlanStatus({ effective, customerCount: count, maxCustomers })
-      })
-  }, [user?.id])
 
   const isPro = planStatus?.effective?.plan === 'pro'
 
@@ -131,46 +108,6 @@ export default function DashboardLayout() {
     } catch {
       toast.error('Error al cerrar sesión')
     }
-  }
-
-  // ── Cashier layout ─────────────────────────────────────────────────────────
-  const cashier = getCashierSession()
-  if (cashier) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <header className="fixed top-0 inset-x-0 h-14 z-40 bg-dark border-b border-white/[0.06] flex items-center justify-between px-4">
-          <Link to="/dashboard/nueva-compra" className="flex items-center gap-2">
-            <span className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/15 shrink-0">
-              <Star className="w-3 h-3 text-primary fill-primary" />
-            </span>
-            <span
-              className="text-primary text-[20px] leading-none tracking-[0.08em]"
-              style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
-            >
-              Loyia
-            </span>
-          </Link>
-
-          <span className="absolute left-1/2 -translate-x-1/2 text-[12px] text-white/40 font-medium truncate max-w-[140px]">
-            {cashier.business_name}
-          </span>
-
-          <button
-            onClick={() => { clearCashierSession(); navigate('/login') }}
-            className="flex items-center gap-1.5 text-white/35 hover:text-red-400 transition-colors duration-150 py-1 pl-2"
-          >
-            <span className="text-[12px] font-medium truncate max-w-[100px]">{cashier.cashier_name}</span>
-            <LogOut className="w-[15px] h-[15px] shrink-0" strokeWidth={1.8} />
-          </button>
-        </header>
-
-        <main className="flex-1 min-h-screen bg-cream pt-14 flex justify-center">
-          <div className="w-full max-w-xl px-4">
-            <Outlet />
-          </div>
-        </main>
-      </div>
-    )
   }
 
   return (
@@ -441,5 +378,65 @@ export default function DashboardLayout() {
       </nav>
 
     </div>
+  )
+}
+
+// ── Outer wrapper ─────────────────────────────────────────────────────────────
+
+export default function DashboardLayout() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  // Redirect cashiers away from non-purchase routes
+  useEffect(() => {
+    if (isCashierSession() && location.pathname !== '/dashboard/nueva-compra') {
+      navigate('/dashboard/nueva-compra', { replace: true })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Cashier layout ─────────────────────────────────────────────────────────
+  const cashier = getCashierSession()
+  if (cashier) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <header className="fixed top-0 inset-x-0 h-14 z-40 bg-dark border-b border-white/[0.06] flex items-center justify-between px-4">
+          <Link to="/dashboard/nueva-compra" className="flex items-center gap-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/15 shrink-0">
+              <Star className="w-3 h-3 text-primary fill-primary" />
+            </span>
+            <span
+              className="text-primary text-[20px] leading-none tracking-[0.08em]"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
+            >
+              Loyia
+            </span>
+          </Link>
+
+          <span className="absolute left-1/2 -translate-x-1/2 text-[12px] text-white/40 font-medium truncate max-w-[140px]">
+            {cashier.business_name}
+          </span>
+
+          <button
+            onClick={() => { clearCashierSession(); navigate('/login') }}
+            className="flex items-center gap-1.5 text-white/35 hover:text-red-400 transition-colors duration-150 py-1 pl-2"
+          >
+            <span className="text-[12px] font-medium truncate max-w-[100px]">{cashier.cashier_name}</span>
+            <LogOut className="w-[15px] h-[15px] shrink-0" strokeWidth={1.8} />
+          </button>
+        </header>
+
+        <main className="flex-1 min-h-screen bg-cream pt-14 flex justify-center">
+          <div className="w-full max-w-xl px-4">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  return (
+    <BusinessProvider>
+      <DashboardLayoutInner />
+    </BusinessProvider>
   )
 }

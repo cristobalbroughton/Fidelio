@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Loader2, Plus, Gift, Star, X } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { useBusinessContext } from '../../contexts/BusinessContext'
 import {
   PLAN_LIMITS, WA_UPGRADE_LINK,
   getEffectivePlan, getPlanLimits, getUpgradeMessage,
@@ -26,11 +26,7 @@ const EMPTY_FORM = {
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export default function RecompensasPage() {
-  const { user } = useAuth()
-
-  // Business
-  const [business, setBusiness]           = useState(null)
-  const [loadingBusiness, setLB]          = useState(true)
+  const { business, loadingBusiness } = useBusinessContext()
 
   // Lista recompensas
   const [rewards, setRewards]             = useState([])
@@ -49,22 +45,6 @@ export default function RecompensasPage() {
   const set    = field => e => setForm(f => ({ ...f, [field]: e.target.value }))
   const setNum = field => e => setForm(f => ({ ...f, [field]: e.target.value.replace(/\D/g, '') }))
   const toggle = field => () => setForm(f => ({ ...f, [field]: !f[field] }))
-
-  // ── Carga business ──────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!user?.id) return
-    supabase
-      .from('businesses')
-      .select('id, name, plan, pro_expires_at')
-      .eq('owner_id', user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (error) toast.error('Error cargando datos del negocio')
-        else setBusiness(data)
-        setLB(false)
-      })
-  }, [user?.id])
 
   // ── Carga recompensas ───────────────────────────────────────────────────────
 

@@ -5,9 +5,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import toast from 'react-hot-toast'
-import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { getEffectivePlan } from '../../lib/planLimits'
+import { useBusinessContext } from '../../contexts/BusinessContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -111,11 +111,8 @@ function PillToggle({ value, options, onChange }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
-  const { user } = useAuth()
+  const { business, loadingBusiness } = useBusinessContext()
   const navigate = useNavigate()
-
-  const [business, setBusiness]       = useState(null)
-  const [loadingBiz, setLoadingBiz]   = useState(true)
 
   const [staticData, setStaticData]   = useState(null)
   const [loadingStatic, setLS]        = useState(false)
@@ -126,26 +123,13 @@ export default function AnalyticsPage() {
   const [period, setPeriod]           = useState(30)
   const [topTab, setTopTab]           = useState('points')
 
-  // ── 1. Load business + plan check ─────────────────────────────────────────
+  // ── 1. Plan check ─────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!user?.id) return
-    supabase
-      .from('businesses')
-      .select('id, name, plan, pro_expires_at')
-      .eq('owner_id', user.id)
-      .single()
-      .then(({ data: biz }) => {
-        if (!biz) { setLoadingBiz(false); return }
-        const effective = getEffectivePlan(biz)
-        if (effective.plan !== 'pro') {
-          navigate('/dashboard', { replace: true })
-          return
-        }
-        setBusiness(biz)
-        setLoadingBiz(false)
-      })
-  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!business) return
+    const effective = getEffectivePlan(business)
+    if (effective.plan !== 'pro') navigate('/dashboard', { replace: true })
+  }, [business?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 2. Static queries (period-independent) ────────────────────────────────
 
@@ -342,7 +326,7 @@ export default function AnalyticsPage() {
 
   // ── Guards ────────────────────────────────────────────────────────────────
 
-  if (loadingBiz) {
+  if (loadingBusiness) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
         <Loader2 className="w-6 h-6 text-primary animate-spin" />

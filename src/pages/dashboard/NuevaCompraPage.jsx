@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { Loader2, Search, CheckCircle2, Star, X, QrCode, ShoppingBag } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { getCashierSession, isCashierSession } from '../../lib/cashierSession'
+import { getCashierSession, clearCashierSession, isCashierSession } from '../../lib/cashierSession'
 import {
   PLAN_LIMITS, WA_UPGRADE_LINK,
   getEffectivePlan, getPlanLimits, getUpgradeMessage,
@@ -32,6 +33,7 @@ const BTN_PRIMARY =
 
 export default function NuevaCompraPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   // Business (loaded on mount)
   const [business, setBusiness] = useState(null)
@@ -236,6 +238,18 @@ export default function NuevaCompraPage() {
 
     setLoading(true)
     try {
+      if (isCashierSession()) {
+        const cashier = getCashierSession()
+        const { data: member } = await supabase
+          .from('team_members')
+          .select('id')
+          .eq('id', cashier.cashier_id)
+          .eq('business_id', business.id)
+          .eq('is_active', true)
+          .maybeSingle()
+        if (!member) { clearCashierSession(); navigate('/login'); return }
+      }
+
       const { error: txError } = await supabase
         .from('transactions')
         .insert({
@@ -333,6 +347,18 @@ export default function NuevaCompraPage() {
       }
 
       const newBalance = fresh.points_balance - redeemTarget.points_required
+
+      if (isCashierSession()) {
+        const cashier = getCashierSession()
+        const { data: member } = await supabase
+          .from('team_members')
+          .select('id')
+          .eq('id', cashier.cashier_id)
+          .eq('business_id', business.id)
+          .eq('is_active', true)
+          .maybeSingle()
+        if (!member) { clearCashierSession(); navigate('/login'); return }
+      }
 
       const { error: txErr } = await supabase.from('transactions').insert({
         business_id:  business.id,

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Loader2, Search, Star, X, Users, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { INPUT_CLASS } from '../../lib/utils'
+import { useBusinessContext } from '../../contexts/BusinessContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -36,11 +36,7 @@ const TX_TYPE_COLOR = {
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export default function ClientesPage() {
-  const { user } = useAuth()
-
-  // Business
-  const [business, setBusiness]           = useState(null)
-  const [loadingBusiness, setLB]          = useState(true)
+  const { business, loadingBusiness } = useBusinessContext()
 
   // Lista clientes
   const [customers, setCustomers]         = useState([])
@@ -58,22 +54,6 @@ export default function ClientesPage() {
   const [drawerTxs, setDrawerTxs]           = useState([])
   const [loadingDrawer, setLoadingDrawer]   = useState(false)
   const [drawerOpen, setDrawerOpen]         = useState(false)
-
-  // ── Carga business ──────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!user?.id) return
-    supabase
-      .from('businesses')
-      .select('id, name, points_per_clp, welcome_points, slug, plan')
-      .eq('owner_id', user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (error) toast.error('Error cargando datos del negocio')
-        else setBusiness(data)
-        setLB(false)
-      })
-  }, [user?.id])
 
   // ── Carga clientes + totales ────────────────────────────────────────────────
 

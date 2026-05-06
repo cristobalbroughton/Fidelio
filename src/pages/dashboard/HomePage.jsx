@@ -5,9 +5,9 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import toast from 'react-hot-toast'
-import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { WA_UPGRADE_LINK } from '../../lib/planLimits'
+import { useBusinessContext } from '../../contexts/BusinessContext'
 
 // ── Helpers de datos ──────────────────────────────────────────────────────────
 
@@ -59,35 +59,21 @@ const TOOLTIP_STYLE = {
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
-  const { user } = useAuth()
+  const { business, loadingBusiness } = useBusinessContext()
 
-  const [business, setBusiness]         = useState(null)
-  const [loadingBusiness, setLB]        = useState(true)
   const [metrics, setMetrics]           = useState(null)
   const [lineData, setLineData]         = useState([])
   const [barData, setBarData]           = useState([])
   const [loadingData, setLoadingData]   = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
-  // ── Carga business ──────────────────────────────────────────────────────────
+  // ── Inicializar bannerDismissed cuando business carga ────────────────────────
 
   useEffect(() => {
-    if (!user?.id) return
-    supabase
-      .from('businesses')
-      .select('id, name, failed_registrations, plan, primary_color, logo_url, slug')
-      .eq('owner_id', user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (error) toast.error('Error cargando datos del negocio')
-        else {
-          setBusiness(data)
-          const dismissed = localStorage.getItem(`loyia_onboarding_v1_${data?.id}`)
-          if (dismissed) setBannerDismissed(true)
-        }
-        setLB(false)
-      })
-  }, [user?.id])
+    if (!business?.id) return
+    const dismissed = localStorage.getItem(`loyia_onboarding_v1_${business.id}`)
+    if (dismissed) setBannerDismissed(true)
+  }, [business?.id])
 
   // ── Carga métricas ──────────────────────────────────────────────────────────
 
@@ -138,7 +124,7 @@ export default function HomePage() {
         .eq('type', 'earn'),
 
     ]).then(([q1, q2, q3, q4, q5, q6]) => {
-      if (q1.error || q2.error || q3.error) {
+      if (q1.error || q2.error || q3.error || q4.error || q5.error || q6.error) {
         toast.error('Error cargando métricas')
       } else {
         setMetrics({
