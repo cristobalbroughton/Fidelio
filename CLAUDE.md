@@ -33,7 +33,7 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - `businesses`: owner_id, name, slug, category, description, program_name, points_per_clp, welcome_points, primary_color (hex), logo_url (text, nullable), plan (text), last_activity_at (timestamp)
 - `loyalty_customers`: business_id, phone, name, points_balance, visits_count, last_visit_at, joined_at (timestamp — fecha de registro del cliente; usar este campo para filtros de fecha, NO created_at)
 - `transactions`: business_id, customer_id, type (welcome|earn|redeem), points_delta, amount_clp, created_at, reward_id (uuid nullable FK→rewards), cashier_id (uuid nullable FK→team_members), note (text nullable)
-- `rewards`: business_id, name, description (nullable), points_required, type (product|discount|experience), is_active (boolean, default true) — NO tiene columna deleted_at; para filtrar activas usar `.eq('is_active', true)`
+- `rewards`: business_id, name, description (nullable), points_required, type (product|discount|experience), is_active (boolean, default true), deleted_at (timestamptz nullable) — Soft-delete: `.update({ deleted_at: new Date().toISOString() })`; filtrar activas: `.eq('is_active', true).is('deleted_at', null)`
 - `team_members`: business_id, name, pin_hash (bcrypt), is_active (boolean) — tabla del sistema de cajeros Pro
 
 ## Migraciones pendientes / ya aplicadas
@@ -156,6 +156,6 @@ ALTER TABLE transactions ADD COLUMN note text;
   - `clp`: `↑ $X (Y%) vs periodo anterior` / `↓ -$X (-Y%) vs periodo anterior`
   - `pp`: `↑ Xpp vs periodo anterior`; enteros sin decimal (`100pp` no `100.0pp`)
   - `count`: `↑ N (Y%) vs periodo anterior`; si `prev === 0`, omitir porcentaje
-- **rewards (Q9):** NO tiene columna `deleted_at` — no usar `.is('deleted_at', null)`; filtrar por `.eq('is_active', true)` si se necesita solo activas
+- **rewards (Q9):** filtrar activas con `.eq('is_active', true).is('deleted_at', null)` — la columna `deleted_at` existe (soft-delete)
 - Selector de período: PillToggle con opciones 30/60/90 días — solo afecta bloques KPI, hora pico, día activo
 - Bloques estáticos (top clientes, reward perf, at-risk, gráfico mensual) NO cambian con el período

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -20,7 +20,24 @@ export default function LoginPage() {
   const [slug, setSlug] = useState('')
   const [pin, setPin] = useState('')
   const [submittingCajero, setSubmittingCajero] = useState(false)
+  const [attempts, setAttempts] = useState(0)
+  const [blockedUntil, setBlockedUntil] = useState(null)
+  const [countdown, setCountdown] = useState(0)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!blockedUntil) return
+    const interval = setInterval(() => {
+      const remaining = Math.ceil((blockedUntil - Date.now()) / 1000)
+      if (remaining <= 0) {
+        setBlockedUntil(null)
+        setCountdown(0)
+      } else {
+        setCountdown(remaining)
+      }
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [blockedUntil])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -38,6 +55,12 @@ export default function LoginPage() {
   const handleCajeroLogin = async (e) => {
     e.preventDefault()
     if (!slug.trim() || pin.length !== 6) return
+
+    if (blockedUntil && Date.now() < blockedUntil) {
+      toast.error(`Demasiados intentos. Espera ${countdown} segundos.`)
+      return
+    }
+
     setSubmittingCajero(true)
     try {
       const { data: biz } = await supabase
@@ -73,10 +96,22 @@ export default function LoginPage() {
       }
 
       if (!matched) {
-        toast.error('PIN incorrecto')
+        const next = attempts + 1
+        if (next >= 5) {
+          const until = Date.now() + 30000
+          setBlockedUntil(until)
+          setCountdown(30)
+          setAttempts(0)
+          toast.error('Demasiados intentos. Espera 30 segundos.')
+        } else {
+          setAttempts(next)
+          toast.error('PIN incorrecto')
+        }
         return
       }
 
+      setAttempts(0)
+      setBlockedUntil(null)
       setCashierSession({
         type: 'cashier',
         business_id: biz.id,
@@ -213,9 +248,15 @@ export default function LoginPage() {
                     />
                   </div>
 
+                  {blockedUntil && countdown > 0 && (
+                    <p className="text-red-400 text-sm text-center">
+                      Demasiados intentos. Espera {countdown}s para continuar.
+                    </p>
+                  )}
+
                   <button
                     type="submit"
-                    disabled={submittingCajero || !slug.trim() || pin.length !== 6}
+                    disabled={submittingCajero || !slug.trim() || pin.length !== 6 || (blockedUntil && Date.now() < blockedUntil)}
                     className={BTN_CLS}
                   >
                     {submittingCajero && <Loader2 className="w-4 h-4 animate-spin" />}
