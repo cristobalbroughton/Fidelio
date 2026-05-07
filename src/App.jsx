@@ -1,3 +1,4 @@
+import React, { Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
@@ -17,7 +18,7 @@ import RecompensasPage from './pages/dashboard/RecompensasPage'
 import MiniWebAppPage from './pages/MiniWebAppPage'
 import AdminPage from './pages/AdminPage'
 import ConfiguracionPage from './pages/dashboard/ConfiguracionPage'
-import AnalyticsPage from './pages/dashboard/AnalyticsPage'
+const AnalyticsPage = React.lazy(() => import('./pages/dashboard/AnalyticsPage'))
 import LandingPage from './pages/LandingPage'
 import PrivacidadPage from './pages/PrivacidadPage'
 import TerminosPage from './pages/TerminosPage'
@@ -72,7 +73,15 @@ export default function App() {
               <Route path="clientes"        element={<ClientesPage />} />
               <Route path="recompensas"     element={<RecompensasPage />} />
               <Route path="configuracion"   element={<ConfiguracionPage />} />
-              <Route path="analytics"       element={<AnalyticsPage />} />
+              <Route path="analytics"       element={
+                <Suspense fallback={
+                  <div className="flex items-center justify-center h-64">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                  </div>
+                }>
+                  <AnalyticsPage />
+                </Suspense>
+              } />
             </Route>
 
             {/* Admin — protegida, con DashboardLayout */}

@@ -8,14 +8,13 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { getEffectivePlan } from '../../lib/planLimits'
 import { useBusinessContext } from '../../contexts/BusinessContext'
+import { fmtCLP } from '../../lib/utils'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const MONTH_LABELS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const DOW_LABELS   = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
 const DOW_ORDER    = [1, 2, 3, 4, 5, 6, 0] // Mon → Sun
-
-function fmtCLP(n)  { return '$' + Math.round(n).toLocaleString('es-CL') }
 function fmtPct(n)  { return Math.round(n) + '%' }
 function fmtNum(n)  { return Math.round(n).toLocaleString('es-CL') }
 

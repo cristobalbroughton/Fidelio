@@ -2,14 +2,8 @@ import { useState, useEffect } from 'react'
 import { Loader2, Search, Star, X, Users, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
-import { INPUT_CLASS } from '../../lib/utils'
+import { INPUT_CLASS, fmtCLP } from '../../lib/utils'
 import { useBusinessContext } from '../../contexts/BusinessContext'
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatCLP(amount) {
-  return amount.toLocaleString('es-CL')
-}
 
 function formatDateShort(iso) {
   return new Date(iso).toLocaleDateString('es-CL', {
@@ -401,7 +395,7 @@ export default function ClientesPage() {
                     </span>
                   </td>
                   <td className="px-5 py-4 text-right">
-                    <span className="text-[14px] text-dark font-medium">${formatCLP(spendMap[c.id] ?? 0)}</span>
+                    <span className="text-[14px] text-dark font-medium">{fmtCLP(spendMap[c.id] ?? 0)}</span>
                   </td>
                   <td className="px-5 py-4 text-center">
                     <span className="text-[14px] text-dark/70">{c.visits_count}</span>
@@ -515,7 +509,7 @@ export default function ClientesPage() {
                     </p>
                     {tx.type === 'earn' && tx.amount_clp > 0 && (
                       <p className="text-[12px] text-dark/40 mt-0.5">
-                        ${formatCLP(tx.amount_clp)}
+                        {fmtCLP(tx.amount_clp)}
                       </p>
                     )}
                   </div>
