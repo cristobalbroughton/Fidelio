@@ -5,6 +5,7 @@ import {
   Coffee, UtensilsCrossed, Scissors, ShoppingBag, Check,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import { supabase } from '../lib/supabase'
 
 // ── Scroll animation hook ─────────────────────────────────────────────────────
 
@@ -266,13 +267,148 @@ function HowItWorks() {
   )
 }
 
+// ── Prueba social: métricas en vivo + testimonio ──────────────────────────────
+
+const TESTIMONIOS = [
+  {
+    nombre: 'Valentina',
+    negocio: 'Castella',
+    ciudad: 'Santiago, Chile',
+    texto: 'En el primer mes registré más de 30 clientas habituales que antes no tenía forma de identificar. Ahora sé quiénes son mis mejores clientas.',
+    logo: '/logos/castella.png',
+  },
+]
+
+function TestimonialCard({ t }) {
+  const [imgError, setImgError] = useState(false)
+  return (
+    <div className="bg-white/[0.05] border border-white/[0.08] rounded-2xl p-8 max-w-2xl mx-auto">
+      <span
+        className="block text-primary/35 leading-none mb-2 select-none"
+        style={{ fontFamily: 'Georgia, serif', fontSize: 72, lineHeight: 1 }}
+      >
+        "
+      </span>
+      <p
+        className="text-white/80 text-[17px] leading-relaxed mb-7"
+        style={{ fontFamily: 'var(--font-display)' }}
+      >
+        {t.texto}
+      </p>
+      <div className="flex items-center gap-4 pt-5 border-t border-white/[0.07]">
+        {!imgError ? (
+          <img
+            src={t.logo}
+            alt={t.negocio}
+            onError={() => setImgError(true)}
+            className="w-24 h-auto rounded-lg bg-white p-2 object-contain shrink-0"
+          />
+        ) : (
+          <div className="w-24 h-12 rounded-lg bg-white p-2 flex items-center justify-center shrink-0">
+            <span
+              className="text-primary text-[18px]"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
+            >
+              {t.negocio[0]}
+            </span>
+          </div>
+        )}
+        <div>
+          <p className="text-white/75 font-semibold text-[14px]">{t.nombre}</p>
+          <p className="text-white/35 text-[12px] mt-0.5">{t.negocio} · {t.ciudad}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LiveSocialProof() {
+  const [ref, visible] = useFadeUp()
+  const [counts, setCounts] = useState({ businesses: null, customers: null, transactions: null })
+
+  useEffect(() => {
+    async function fetchCounts() {
+      const [b, c, t] = await Promise.all([
+        supabase.from('businesses').select('*', { count: 'exact', head: true }),
+        supabase.from('loyalty_customers').select('*', { count: 'exact', head: true }),
+        supabase.from('transactions').select('*', { count: 'exact', head: true }),
+      ])
+      setCounts({ businesses: b.count, customers: c.count, transactions: t.count })
+    }
+    fetchCounts()
+  }, [])
+
+  const metrics = [
+    { value: counts.businesses,   label: 'negocios activos' },
+    { value: counts.customers,    label: 'clientes registrados' },
+    { value: counts.transactions, label: 'transacciones procesadas' },
+  ]
+
+  /* Carrusel futuro — descomentar y reemplazar activeIndex por state:
+  const [activeIndex, setActiveIndex] = useState(0)
+  */
+  const activeIndex = 0
+
+  return (
+    <section className="bg-dark py-20 px-5">
+      <div className="max-w-5xl mx-auto">
+        <div ref={ref} className={fadeClass(visible)}>
+
+          {/* Parte A — Métricas en vivo */}
+          <p className="text-white/25 text-xs font-semibold uppercase tracking-widest text-center mb-3">
+            Loyia en números
+          </p>
+          <div className="grid grid-cols-3 gap-6 sm:gap-10 mb-16">
+            {metrics.map((m) => (
+              <div key={m.label} className="text-center flex flex-col gap-2">
+                <p
+                  className="text-primary leading-none"
+                  style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 52 }}
+                >
+                  {m.value === null
+                    ? <span className="text-primary/30 text-4xl">—</span>
+                    : m.value.toLocaleString('es-CL')}
+                </p>
+                <p className="text-white/35 text-[13px] leading-relaxed">{m.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Parte B — Testimonio */}
+          <p className="text-white/25 text-xs font-semibold uppercase tracking-widest text-center mb-8">
+            Lo que dicen nuestros clientes
+          </p>
+          <TestimonialCard t={TESTIMONIOS[activeIndex]} />
+
+          {/* Puntos de navegación — descomentar para activar carrusel:
+          {TESTIMONIOS.length > 1 && (
+            <div className="flex justify-center gap-2 mt-6">
+              {TESTIMONIOS.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveIndex(i)}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    i === activeIndex ? 'bg-primary' : 'bg-white/20 hover:bg-white/40'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+          */}
+
+        </div>
+      </div>
+    </section>
+  )
+}
+
 // ── For whom ──────────────────────────────────────────────────────────────────
 
 const FOR_WHOM = [
-  { icon: Coffee,           name: 'Cafeterías y pastelerías',  tagline: '¿Tus clientes no vuelven? Fidelízalos en su primera visita.' },
-  { icon: UtensilsCrossed,  name: 'Restaurantes y delivery',   tagline: 'Convierte cada pedido en una razón para volver.' },
-  { icon: Scissors,         name: 'Peluquerías y estéticas',   tagline: 'Premia la fidelidad de tus clientes habituales.' },
-  { icon: ShoppingBag,      name: 'Tiendas y retail',          tagline: 'Más recompensas, más visitas, más ventas.' },
+  { icon: Coffee,           name: 'Cafeterías y pastelerías',  tagline: 'El café de la esquina ya tiene programa de puntos. ¿Y el tuyo?' },
+  { icon: UtensilsCrossed,  name: 'Restaurantes y delivery',   tagline: 'Cada delivery es un cliente que no ves. Con Loyia, sabes quién vuelve y quién no.' },
+  { icon: Scissors,         name: 'Peluquerías y estéticas',   tagline: 'Tus clientes van cada 3 semanas. Con puntos, van cada 2 semanas.' },
+  { icon: ShoppingBag,      name: 'Tiendas y retail',          tagline: 'Transforma compradores ocasionales en clientes fijos. Sin tarjetas de papel, sin apps.' },
 ]
 
 function ForWhom() {
@@ -498,6 +634,7 @@ export default function LandingPage() {
       <Hero />
       <SocialProof />
       <HowItWorks />
+      <LiveSocialProof />
       <ForWhom />
       <Pricing />
       <FinalCTA />
