@@ -301,22 +301,13 @@ export default function AnalyticsPage() {
       const retPrev = frequent.length > 0
         ? (frequent.filter(c => activePrev.has(c.id)).length / frequent.length) * 100 : 0
 
-      // Hora pico (promedio por día del período)
       const hourCounts = Array(24).fill(0)
       currTxs.forEach(tx => hourCounts[new Date(tx.created_at).getHours()]++)
-      const hourData = hourCounts.map((n, h) => ({
-        hour: `${h}h`,
-        value: parseFloat((n / Math.max(period, 1)).toFixed(2)),
-      }))
+      const hourData = hourCounts.map((n, h) => ({ hour: `${h}h`, value: n }))
 
-      // Día más activo (promedio por semana)
       const dowCounts = Array(7).fill(0)
       currTxs.forEach(tx => dowCounts[new Date(tx.created_at).getDay()]++)
-      const weeks = Math.max(period / 7, 1)
-      const dowData = DOW_ORDER.map((dow, i) => ({
-        day: DOW_LABELS[i],
-        value: parseFloat((dowCounts[dow] / weeks).toFixed(2)),
-      }))
+      const dowData = DOW_ORDER.map((dow, i) => ({ day: DOW_LABELS[i], value: dowCounts[dow] }))
 
       setPeriodData({ ticketCurr, ticketPrev, retCurr, retPrev, newCurr, newPrev, hourData, dowData })
       setLP(false)
@@ -409,8 +400,8 @@ export default function AnalyticsPage() {
         ) : pd ? (
           <>
             <SectionCard
-              title="Hora pico de ventas"
-              subtitle="Promedio de transacciones por hora del día"
+              title="Hora punta de ventas"
+              subtitle="Total de transacciones por hora en el período"
             >
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={pd.hourData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
@@ -423,7 +414,7 @@ export default function AnalyticsPage() {
                     interval={2}
                   />
                   <YAxis tick={AXIS_STYLE} tickLine={false} axisLine={false} width={32} />
-                  <Tooltip {...TOOLTIP} formatter={v => [v, 'promedio']} />
+                  <Tooltip {...TOOLTIP} formatter={v => [`${v} transacciones`, '']} />
                   <Bar dataKey="value" fill="#c9a84c" radius={[3, 3, 0, 0]} maxBarSize={20} />
                 </BarChart>
               </ResponsiveContainer>
@@ -431,14 +422,14 @@ export default function AnalyticsPage() {
 
             <SectionCard
               title="Día más activo"
-              subtitle="Promedio de transacciones por día de la semana"
+              subtitle="Total de transacciones por día en el período"
             >
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={pd.dowData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
                   <XAxis dataKey="day" tick={AXIS_STYLE} tickLine={false} axisLine={false} />
                   <YAxis tick={AXIS_STYLE} tickLine={false} axisLine={false} width={32} />
-                  <Tooltip {...TOOLTIP} formatter={v => [v, 'promedio']} />
+                  <Tooltip {...TOOLTIP} formatter={v => [`${v} transacciones`, '']} />
                   <Bar dataKey="value" fill="#c9a84c" radius={[3, 3, 0, 0]} maxBarSize={28} />
                 </BarChart>
               </ResponsiveContainer>

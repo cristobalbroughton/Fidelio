@@ -40,7 +40,7 @@ function PlanBanner({ status, className = '' }) {
     msg = `Tu plan venció. ${daysLeft} día${daysLeft !== 1 ? 's' : ''} para renovar.`
   } else if (atLimit) {
     bg = 'bg-orange-500/[0.12] border-orange-500/25'; textCls = 'text-orange-400'
-    msg = `Límite alcanzado. ${getUpgradeMessage(plan)} para crecer.`
+    msg = 'Alcanzaste el límite de clientes. Sube de plan para continuar.'
   } else {
     bg = 'bg-yellow-500/[0.10] border-yellow-500/20'; textCls = 'text-yellow-500'
     msg = `${customerCount}/${maxCustomers} clientes — acercándote al límite.`
