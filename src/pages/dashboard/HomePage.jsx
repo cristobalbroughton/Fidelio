@@ -4,10 +4,10 @@ import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { WA_UPGRADE_LINK } from '../../lib/planLimits'
 import { useBusinessContext } from '../../contexts/BusinessContext'
+import ErrorState from '../../components/ErrorState'
 
 // ── Helpers de datos ──────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ function buildBarData(customers) {
 
 // ── Constantes recharts ───────────────────────────────────────────────────────
 
-const TICK = { fontSize: 11, fill: 'rgba(15,15,15,0.4)' }
+const TICK = { fontSize: 11, fill: 'rgba(15,15,15,0.55)' }
 const TOOLTIP_STYLE = {
   contentStyle: {
     background: '#1a1a1a',
@@ -65,6 +65,8 @@ export default function HomePage() {
   const [lineData, setLineData]         = useState([])
   const [barData, setBarData]           = useState([])
   const [loadingData, setLoadingData]   = useState(false)
+  const [loadError, setLoadError]       = useState(false)
+  const [reloadKey, setReloadKey]       = useState(0)
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   // ── Inicializar bannerDismissed cuando business carga ────────────────────────
@@ -83,6 +85,7 @@ export default function HomePage() {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
     const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString()
     setLoadingData(true)
+    setLoadError(false)
 
     Promise.all([
       // Q1: total clientes
@@ -125,7 +128,7 @@ export default function HomePage() {
 
     ]).then(([q1, q2, q3, q4, q5, q6]) => {
       if (q1.error || q2.error || q3.error || q4.error || q5.error || q6.error) {
-        toast.error('Error cargando métricas')
+        setLoadError(true)
       } else {
         setMetrics({
           totalClientes:  q1.count ?? 0,
@@ -139,7 +142,7 @@ export default function HomePage() {
       }
       setLoadingData(false)
     })
-  }, [business?.id])
+  }, [business?.id, reloadKey])
 
   // ── Guards ──────────────────────────────────────────────────────────────────
 
@@ -173,10 +176,20 @@ export default function HomePage() {
         >
           Dashboard
         </h1>
-        <p className="text-dark/45 text-sm mt-1">
+        <p className="text-dark/60 text-sm mt-1">
           Resumen de {business?.name ?? 'tu programa de fidelización'}.
         </p>
       </div>
+
+      {/* Error de carga con reintento */}
+      {loadError && (
+        <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm mb-8">
+          <ErrorState
+            message="No pudimos cargar las métricas de tu negocio"
+            onRetry={() => setReloadKey(k => k + 1)}
+          />
+        </div>
+      )}
 
       {/* ── Banner de onboarding ──────────────────────────────────────────── */}
       {(() => {
@@ -258,7 +271,9 @@ export default function HomePage() {
                 <Icon className="w-[15px] h-[15px] text-primary" strokeWidth={1.9} />
               </span>
             </div>
-            {loadingData || value === undefined ? (
+            {loadError ? (
+              <p className="text-[28px] leading-none text-dark/25" aria-label="Sin datos">—</p>
+            ) : loadingData || value === undefined ? (
               <div className="h-12 w-24 bg-dark/[0.06] rounded-lg animate-pulse" />
             ) : (
               <p
@@ -306,9 +321,17 @@ export default function HomePage() {
 
         {/* LineChart — visitas 30 días */}
         <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm p-6">
-          <p className="text-[13px] font-medium text-dark/55 mb-5">Visitas — últimos 30 días</p>
-          {loadingData ? (
+          <p className="text-[13px] font-medium text-dark/60 mb-5">Visitas — últimos 30 días</p>
+          {loadingData || loadError ? (
             <div className="h-48 bg-dark/[0.04] rounded-xl animate-pulse" />
+          ) : (metrics?.earnTxTotal ?? 0) === 0 ? (
+            <div className="h-48 flex items-center justify-center">
+              <p className="text-dark/45 text-sm text-center px-4">
+                Aún no hay visitas registradas.
+                <br />
+                Registra tu primera compra para ver el gráfico.
+              </p>
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height={192}>
               <LineChart data={lineData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
@@ -347,9 +370,17 @@ export default function HomePage() {
 
         {/* BarChart — distribución de puntos */}
         <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm p-6">
-          <p className="text-[13px] font-medium text-dark/55 mb-5">Clientes por rango de puntos</p>
-          {loadingData ? (
+          <p className="text-[13px] font-medium text-dark/60 mb-5">Clientes por rango de puntos</p>
+          {loadingData || loadError ? (
             <div className="h-48 bg-dark/[0.04] rounded-xl animate-pulse" />
+          ) : (metrics?.totalClientes ?? 0) === 0 ? (
+            <div className="h-48 flex items-center justify-center">
+              <p className="text-dark/45 text-sm text-center px-4">
+                Aún no tienes clientes registrados.
+                <br />
+                Comparte tu link para que se unan al programa.
+              </p>
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height={192}>
               <BarChart data={barData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>

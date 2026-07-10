@@ -4,6 +4,42 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { INPUT_CLASS, fmtCLP } from '../../lib/utils'
 import { useBusinessContext } from '../../contexts/BusinessContext'
+import { useModalA11y } from '../../lib/useModalA11y'
+import ErrorState from '../../components/ErrorState'
+
+// Empty state compartido entre vista móvil (cards) y desktop (tabla)
+function EmptyClientes({ search, business }) {
+  if (search) {
+    return (
+      <>
+        <Search className="w-8 h-8 text-dark/15 mx-auto mb-3" aria-hidden />
+        <p className="text-dark/55 text-sm">Sin resultados para &ldquo;{search}&rdquo;</p>
+      </>
+    )
+  }
+  return (
+    <>
+      <div className="w-12 h-12 rounded-2xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-4">
+        <Users className="w-5 h-5 text-primary" aria-hidden />
+      </div>
+      <p className="text-dark font-semibold text-[15px] mb-1.5">Aún no tienes clientes</p>
+      <p className="text-dark/60 text-sm leading-relaxed mb-5 max-w-sm mx-auto">
+        Comparte el link de tu programa con tus clientes para que se registren y empiecen a acumular puntos.
+      </p>
+      {business?.slug && (
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(`${window.location.origin}/c/${business.slug}`)
+            toast.success('Link copiado')
+          }}
+          className="inline-flex items-center gap-2 bg-dark/[0.04] hover:bg-dark/[0.07] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[13px] font-mono text-dark/60 transition-colors"
+        >
+          {window.location.origin}/c/{business.slug}
+        </button>
+      )}
+    </>
+  )
+}
 
 function formatDateShort(iso) {
   return new Date(iso).toLocaleDateString('es-CL', {
@@ -36,6 +72,8 @@ export default function ClientesPage() {
   const [customers, setCustomers]         = useState([])
   const [spendMap, setSpendMap]           = useState({})
   const [loadingList, setLoadingList]     = useState(false)
+  const [loadError, setLoadError]         = useState(false)
+  const [reloadKey, setReloadKey]         = useState(0)
 
   // Búsqueda
   const [search, setSearch]               = useState('')
@@ -54,6 +92,7 @@ export default function ClientesPage() {
   useEffect(() => {
     if (!business?.id) return
     setLoadingList(true)
+    setLoadError(false)
     Promise.all([
       supabase
         .from('loyalty_customers')
@@ -67,7 +106,7 @@ export default function ClientesPage() {
         .eq('type', 'earn'),
     ]).then(([{ data: custs, error: e1 }, { data: txs, error: e2 }]) => {
       if (e1 || e2) {
-        toast.error('Error cargando clientes')
+        setLoadError(true)
       } else {
         setCustomers(custs ?? [])
         const map = {}
@@ -78,7 +117,7 @@ export default function ClientesPage() {
       }
       setLoadingList(false)
     })
-  }, [business?.id])
+  }, [business?.id, reloadKey])
 
   // ── Drawer ──────────────────────────────────────────────────────────────────
 
@@ -107,6 +146,9 @@ export default function ClientesPage() {
     setDrawerOpen(false)
     setTimeout(() => { setDrawerCustomer(null); setDrawerTxs([]) }, 300)
   }
+
+  // Drawer: Escape cierra + retorno de foco
+  useModalA11y(drawerOpen, handleCloseDrawer)
 
   // ── Exportar CSV ────────────────────────────────────────────────────────────
 
@@ -201,7 +243,7 @@ export default function ClientesPage() {
           >
             Clientes
           </h1>
-          <p className="text-dark/45 text-sm mt-1">
+          <p className="text-dark/60 text-sm mt-1">
             {customers.length > 0
               ? `${customers.length} cliente${customers.length !== 1 ? 's' : ''} registrado${customers.length !== 1 ? 's' : ''}`
               : 'Gestiona tu base de clientes'}
@@ -222,12 +264,13 @@ export default function ClientesPage() {
 
       {/* Buscador */}
       <div className="mb-5 relative max-w-sm">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-dark/30 pointer-events-none" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-dark/40 pointer-events-none" aria-hidden />
         <input
           type="search"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por nombre o teléfono…"
+          aria-label="Buscar clientes por nombre o teléfono"
           className={INPUT_CLASS + ' pl-10'}
         />
       </div>
@@ -249,36 +292,20 @@ export default function ClientesPage() {
           </div>
         )}
 
+        {/* Error de carga */}
+        {!loadingList && loadError && (
+          <div className="bg-white rounded-2xl border border-black/[0.05]">
+            <ErrorState
+              message="No pudimos cargar tus clientes"
+              onRetry={() => setReloadKey(k => k + 1)}
+            />
+          </div>
+        )}
+
         {/* Empty state */}
-        {!loadingList && filtered.length === 0 && (
+        {!loadingList && !loadError && filtered.length === 0 && (
           <div className="bg-white rounded-2xl border border-black/[0.05] py-14 px-6 text-center">
-            {search ? (
-              <>
-                <Search className="w-8 h-8 text-dark/15 mx-auto mb-3" />
-                <p className="text-dark/40 text-sm">Sin resultados para &ldquo;{search}&rdquo;</p>
-              </>
-            ) : (
-              <>
-                <div className="w-12 h-12 rounded-2xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-5 h-5 text-primary" />
-                </div>
-                <p className="text-dark font-semibold text-[15px] mb-1.5">Aún no tienes clientes</p>
-                <p className="text-dark/45 text-sm leading-relaxed mb-5 max-w-xs mx-auto">
-                  Comparte el link de tu programa con tus clientes para que se registren y empiecen a acumular puntos.
-                </p>
-                {business?.slug && (
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/c/${business.slug}`)
-                      toast.success('Link copiado')
-                    }}
-                    className="inline-flex items-center gap-2 bg-dark/[0.04] hover:bg-dark/[0.07] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[13px] font-mono text-dark/60 transition-colors"
-                  >
-                    {window.location.origin}/c/{business.slug}
-                  </button>
-                )}
-              </>
-            )}
+            <EmptyClientes search={search} business={business} />
           </div>
         )}
 
@@ -341,36 +368,21 @@ export default function ClientesPage() {
                 </tr>
               ))}
 
-              {!loadingList && filtered.length === 0 && (
+              {!loadingList && loadError && (
+                <tr>
+                  <td colSpan={6}>
+                    <ErrorState
+                      message="No pudimos cargar tus clientes"
+                      onRetry={() => setReloadKey(k => k + 1)}
+                    />
+                  </td>
+                </tr>
+              )}
+
+              {!loadingList && !loadError && filtered.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-5 py-14 text-center">
-                    {search ? (
-                      <>
-                        <Search className="w-8 h-8 text-dark/15 mx-auto mb-3" />
-                        <p className="text-dark/40 text-sm">Sin resultados para &ldquo;{search}&rdquo;</p>
-                      </>
-                    ) : (
-                      <>
-                        <div className="w-12 h-12 rounded-2xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-4">
-                          <Users className="w-5 h-5 text-primary" />
-                        </div>
-                        <p className="text-dark font-semibold text-[15px] mb-1.5">Aún no tienes clientes</p>
-                        <p className="text-dark/45 text-sm leading-relaxed mb-4 max-w-sm mx-auto">
-                          Comparte el link de tu programa con tus clientes para que se registren y empiecen a acumular puntos.
-                        </p>
-                        {business?.slug && (
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${window.location.origin}/c/${business.slug}`)
-                              toast.success('Link copiado')
-                            }}
-                            className="inline-flex items-center gap-2 bg-dark/[0.04] hover:bg-dark/[0.07] border border-black/[0.08] rounded-xl px-4 py-2.5 text-[13px] font-mono text-dark/60 transition-colors"
-                          >
-                            {window.location.origin}/c/{business.slug}
-                          </button>
-                        )}
-                      </>
-                    )}
+                    <EmptyClientes search={search} business={business} />
                   </td>
                 </tr>
               )}
@@ -379,7 +391,11 @@ export default function ClientesPage() {
                 <tr
                   key={c.id}
                   onClick={() => handleOpenDrawer(c)}
-                  className="cursor-pointer hover:bg-black/[0.02] transition-colors border-b border-black/[0.04] last:border-0"
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Ver historial de ${c.name ?? c.phone}`}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenDrawer(c) } }}
+                  className="cursor-pointer hover:bg-black/[0.02] focus-visible:bg-black/[0.03] transition-colors border-b border-black/[0.04] last:border-0"
                 >
                   <td className="px-5 py-4">
                     <p className="text-[14px] font-semibold text-dark leading-tight">{c.name ?? c.phone}</p>
@@ -427,6 +443,10 @@ export default function ClientesPage() {
 
       {/* Panel */}
       <div
+        role="dialog"
+        aria-modal={drawerOpen || undefined}
+        aria-label={drawerCustomer ? `Historial de ${drawerCustomer.name ?? drawerCustomer.phone}` : 'Historial de cliente'}
+        aria-hidden={!drawerOpen}
         className={[
           'fixed top-0 right-0 h-full w-full sm:w-96 bg-white z-50',
           'shadow-2xl flex flex-col transition-transform duration-300 ease-out',
@@ -447,9 +467,10 @@ export default function ClientesPage() {
               </div>
               <button
                 onClick={handleCloseDrawer}
-                className="ml-4 mt-0.5 text-dark/35 hover:text-dark transition-colors"
+                aria-label="Cerrar historial"
+                className="ml-4 -mt-2 -mr-2 text-dark/45 hover:text-dark transition-colors flex items-center justify-center w-11 h-11"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5" aria-hidden />
               </button>
             </div>
 

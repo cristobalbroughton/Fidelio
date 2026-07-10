@@ -18,9 +18,9 @@ function generateSlug(name) {
 const STEPS = ['Datos básicos', 'Puntos', 'Recompensa']
 
 const INPUT_CLASS =
-  'w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-4 py-3 text-[#f4f1ea] placeholder-[#f4f1ea]/20 focus:outline-none focus:border-primary/50 transition-colors'
+  'w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-4 py-3 text-[#f4f1ea] placeholder-[#f4f1ea]/40 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition-colors'
 
-const LABEL_CLASS = 'block text-[13px] text-[#f4f1ea]/50 font-medium mb-1.5'
+const LABEL_CLASS = 'block text-[13px] text-[#f4f1ea]/60 font-medium mb-1.5'
 
 export default function OnboardingPage() {
   const { state: locationState } = useLocation()
@@ -45,7 +45,7 @@ export default function OnboardingPage() {
     setForm((prev) => ({ ...prev, [field]: e.target.value }))
 
   const setNum = (field) => (e) =>
-    setForm((prev) => ({ ...prev, [field]: Number(e.target.value) }))
+    setForm((prev) => ({ ...prev, [field]: Number(e.target.value.replace(/\D/g, '')) || 0 }))
 
   const canProceed =
     step === 1
@@ -244,13 +244,13 @@ export default function OnboardingPage() {
               <div>
                 <label className={LABEL_CLASS}>Tasa de puntos</label>
                 <input
-                  type="number"
-                  min={1}
+                  type="text"
+                  inputMode="numeric"
                   value={form.pointsRate}
                   onChange={setNum('pointsRate')}
                   className={INPUT_CLASS}
                 />
-                <p className="text-[12px] text-primary/60 mt-1.5">
+                <p className="text-[12px] text-primary/70 mt-1.5">
                   Cada ${form.pointsRate.toLocaleString('es-CL')} CLP = 1 punto
                 </p>
               </div>
@@ -258,13 +258,13 @@ export default function OnboardingPage() {
               <div>
                 <label className={LABEL_CLASS}>Puntos de bienvenida</label>
                 <input
-                  type="number"
-                  min={0}
+                  type="text"
+                  inputMode="numeric"
                   value={form.welcomePoints}
                   onChange={setNum('welcomePoints')}
                   className={INPUT_CLASS}
                 />
-                <p className="text-[12px] text-[#f4f1ea]/25 mt-1.5">
+                <p className="text-[12px] text-[#f4f1ea]/55 mt-1.5">
                   Se regalan al cliente al registrarse
                 </p>
               </div>
@@ -306,8 +306,8 @@ export default function OnboardingPage() {
               <div>
                 <label className={LABEL_CLASS}>Puntos requeridos</label>
                 <input
-                  type="number"
-                  min={1}
+                  type="text"
+                  inputMode="numeric"
                   value={form.rewardPoints}
                   onChange={setNum('rewardPoints')}
                   className={INPUT_CLASS}

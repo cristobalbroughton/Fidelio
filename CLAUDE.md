@@ -15,7 +15,7 @@ SaaS de programas de fidelización white-label para negocios locales chilenos.
 - React 19 + Vite 8 + React Router DOM 7 + TanStack Query 5
 - Supabase (auth + DB + realtime) — `@supabase/supabase-js` v2
 - Tailwind CSS 4 — tokens en `src/index.css` vía `@theme {}` (NO en tailwind.config.js); postcss usa `@tailwindcss/postcss`
-- lucide-react (iconos), recharts (gráficos), qrcode.react (QR), react-hot-toast (toasts), date-fns (fechas), html5-qrcode (instalado pero NO usar — reemplazado por BarcodeDetector nativo)
+- lucide-react (iconos), recharts (gráficos), qrcode.react (QR), react-hot-toast (toasts), date-fns (fechas) — para escaneo QR se usa la API nativa BarcodeDetector (html5-qrcode fue removido del proyecto)
 
 ## Colores de marca (definidos en src/index.css vía @theme — Tailwind v4)
 - Negro: `#0f0f0f` → `bg-dark` / `text-dark`
@@ -93,7 +93,7 @@ ALTER TABLE transactions ADD COLUMN note text;
 - `transactions` requiere columna `reward_id uuid REFERENCES rewards(id)` (nullable) — añadir en Supabase con `ALTER TABLE transactions ADD COLUMN reward_id uuid REFERENCES rewards(id)`
 
 ## QR Scanner (NuevaCompraPage)
-- Usa API nativa `BarcodeDetector` + `getUserMedia` — NO usar html5-qrcode (falla silenciosamente en móvil)
+- Usa API nativa `BarcodeDetector` + `getUserMedia` — NO usar librerías de escaneo QR (html5-qrcode se probó y se removió del proyecto: fallaba silenciosamente en móvil)
 - Patrón: `if (!('BarcodeDetector' in window))` → fallback a input manual de UUID
 - Loop de escaneo con `requestAnimationFrame`; `detectedRef` previene detecciones múltiples
 - Cleanup: `cancelAnimationFrame` + `stream.getTracks().forEach(t => t.stop())`

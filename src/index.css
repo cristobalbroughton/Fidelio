@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
+/* Fonts se cargan desde index.html con preconnect (evita @import bloqueante) */
 @import "tailwindcss";
 
 @theme {
@@ -7,4 +7,21 @@
   --color-cream: #f4f1ea;
   --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Cormorant Garamond', Georgia, serif;
+}
+
+/* Focus visible global — reemplazo accesible de outline-none */
+:focus-visible {
+  outline: 2px solid #c9a84c;
+  outline-offset: 2px;
+}
+
+/* Animaciones de scroll: sin movimiento si el usuario lo prefiere */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext'
 import { supabase } from '../lib/supabase'
 import { getEffectivePlan, getPlanLimits } from '../lib/planLimits'
 
-const BusinessContext = createContext(null)
+const BusinessContext = createContext({ business: null, loadingBusiness: true })
 
 const BIZ_SELECT = [
   'id', 'name', 'category', 'slug', 'logo_url', 'program_name',
@@ -53,5 +53,5 @@ export function BusinessProvider({ children }) {
 }
 
 export function useBusinessContext() {
-  return useContext(BusinessContext)
+  return useContext(BusinessContext) ?? { business: null, loadingBusiness: true }
 }

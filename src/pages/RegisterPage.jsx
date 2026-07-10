@@ -75,7 +75,7 @@ export default function RegisterPage() {
             <h2 className="text-xl font-semibold text-[#f4f1ea] mb-3">
               Revisa tu email
             </h2>
-            <p className="text-[#f4f1ea]/50 text-sm leading-relaxed mb-7">
+            <p className="text-[#f4f1ea]/60 text-sm leading-relaxed mb-7">
               Te enviamos un link de confirmación a{' '}
               <span className="text-[#f4f1ea]/80 font-medium">{email}</span>.
               Haz click en el link para activar tu cuenta.
@@ -95,7 +95,7 @@ export default function RegisterPage() {
 
             <button
               onClick={() => { setView('form'); setResendError('') }}
-              className="text-[13px] text-[#f4f1ea]/30 hover:text-[#f4f1ea]/50 transition-colors"
+              className="text-[13px] text-[#f4f1ea]/55 hover:text-[#f4f1ea]/80 transition-colors mt-3 py-2 min-h-[44px]"
             >
               ¿Email incorrecto? Volver al registro
             </button>
@@ -112,7 +112,7 @@ export default function RegisterPage() {
 
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-primary tracking-tight">Loyia</h1>
-          <p className="text-[#f4f1ea]/50 mt-2 text-sm">Crea tu cuenta</p>
+          <p className="text-[#f4f1ea]/60 mt-2 text-sm">Crea tu cuenta</p>
         </div>
 
         <div className="bg-[#1a1a1a] rounded-2xl p-8 border border-white/10">
@@ -127,7 +127,7 @@ export default function RegisterPage() {
                 onChange={(e) => setBusinessName(e.target.value)}
                 required
                 placeholder="Ej: Castella Pastelería"
-                className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-4 py-3 text-[#f4f1ea] placeholder-[#f4f1ea]/20 focus:outline-none focus:border-primary/50 transition-colors"
+                className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-4 py-3 text-[#f4f1ea] placeholder-[#f4f1ea]/40 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition-colors"
               />
             </div>
 
@@ -140,7 +140,7 @@ export default function RegisterPage() {
                 required
                 autoComplete="email"
                 placeholder="tu@negocio.cl"
-                className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-4 py-3 text-[#f4f1ea] placeholder-[#f4f1ea]/20 focus:outline-none focus:border-primary/50 transition-colors"
+                className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-4 py-3 text-[#f4f1ea] placeholder-[#f4f1ea]/40 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition-colors"
               />
             </div>
 
@@ -154,7 +154,7 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 placeholder="Mínimo 6 caracteres"
                 minLength={6}
-                className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-4 py-3 text-[#f4f1ea] placeholder-[#f4f1ea]/20 focus:outline-none focus:border-primary/50 transition-colors"
+                className="w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-4 py-3 text-[#f4f1ea] placeholder-[#f4f1ea]/40 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition-colors"
               />
             </div>
 
@@ -166,7 +166,7 @@ export default function RegisterPage() {
                   onChange={e => { setTermsAccepted(e.target.checked); setTermsError(false) }}
                   className="mt-0.5 w-4 h-4 shrink-0 accent-[#c9a84c] cursor-pointer"
                 />
-                <span className="text-[13px] text-[#f4f1ea]/50 leading-snug">
+                <span className="text-[13px] text-[#f4f1ea]/60 leading-snug">
                   Al crear una cuenta, aceptas nuestros{' '}
                   <a
                     href="/terminos"

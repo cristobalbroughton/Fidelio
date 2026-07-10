@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import bcrypt from 'bcryptjs'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { setCashierSession } from '../lib/cashierSession'
@@ -20,7 +19,6 @@ export default function LoginPage() {
   const [slug, setSlug] = useState('')
   const [pin, setPin] = useState('')
   const [submittingCajero, setSubmittingCajero] = useState(false)
-  const [attempts, setAttempts] = useState(0)
   const [blockedUntil, setBlockedUntil] = useState(null)
   const [countdown, setCountdown] = useState(0)
   const navigate = useNavigate()
@@ -63,61 +61,43 @@ export default function LoginPage() {
 
     setSubmittingCajero(true)
     try {
-      const { data: biz } = await supabase
-        .from('businesses')
-        .select('id, name, slug')
-        .eq('slug', slug.trim().toLowerCase())
-        .maybeSingle()
+      const { data: biz, error: bizErr } = await supabase
+        .rpc('get_business_public', { p_slug: slug.trim().toLowerCase() })
+      if (bizErr) throw bizErr
 
       if (!biz) {
         toast.error('Negocio no encontrado')
         return
       }
 
-      const { data: members } = await supabase
-        .from('team_members')
-        .select('id, name, pin_hash, is_active')
-        .eq('business_id', biz.id)
+      const { data, error } = await supabase
+        .rpc('verify_cashier_pin', { p_business_id: biz.id, p_pin: pin })
+      if (error) throw error
 
-      let matched = null
-      let disabledMatch = false
-      for (const m of (members ?? [])) {
-        const ok = await bcrypt.compare(pin, m.pin_hash)
-        if (ok) {
-          if (!m.is_active) disabledMatch = true
-          else matched = m
-          break
-        }
+      if (data?.status === 'rate_limited') {
+        const secs = data.retry_after ?? 30
+        setBlockedUntil(Date.now() + secs * 1000)
+        setCountdown(secs)
+        toast.error(`Demasiados intentos. Espera ${secs} segundos.`)
+        return
       }
-
-      if (disabledMatch) {
+      if (data?.status === 'disabled') {
         toast.error('Este cajero está deshabilitado. Contacta al administrador.')
         return
       }
-
-      if (!matched) {
-        const next = attempts + 1
-        if (next >= 5) {
-          const until = Date.now() + 30000
-          setBlockedUntil(until)
-          setCountdown(30)
-          setAttempts(0)
-          toast.error('Demasiados intentos. Espera 30 segundos.')
-        } else {
-          setAttempts(next)
-          toast.error('PIN incorrecto')
-        }
+      if (data?.status !== 'ok') {
+        toast.error('PIN incorrecto')
         return
       }
 
-      setAttempts(0)
       setBlockedUntil(null)
+      setCountdown(0)
       setCashierSession({
         type: 'cashier',
         business_id: biz.id,
         business_name: biz.name,
-        cashier_id: matched.id,
-        cashier_name: matched.name,
+        cashier_id: data.cashier.id,
+        cashier_name: data.cashier.name,
         slug: biz.slug,
       })
       navigate('/dashboard/nueva-compra')
@@ -129,7 +109,7 @@ export default function LoginPage() {
   }
 
   const INPUT_CLS =
-    'w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-4 py-3 text-[#f4f1ea] placeholder-[#f4f1ea]/20 focus:outline-none focus:border-primary/50 transition-colors'
+    'w-full bg-[#0f0f0f] border border-white/10 rounded-lg px-4 py-3 text-[#f4f1ea] placeholder-[#f4f1ea]/40 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition-colors'
 
   const BTN_CLS =
     'w-full bg-primary text-[#0f0f0f] font-semibold py-3 rounded-lg hover:bg-primary/90 transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2'
@@ -140,25 +120,27 @@ export default function LoginPage() {
 
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-primary tracking-tight">Loyia</h1>
-          <p className="text-[#f4f1ea]/50 mt-2 text-sm">Panel de administración</p>
+          <p className="text-[#f4f1ea]/60 mt-2 text-sm">Panel de administración</p>
         </div>
 
         <div className="bg-[#1a1a1a] rounded-2xl border border-white/10 overflow-hidden">
 
           {/* Tabs */}
-          <div className="flex border-b border-white/[0.08]">
+          <div className="flex border-b border-white/[0.08]" role="tablist" aria-label="Tipo de acceso">
             {[
               { key: 'negocio', label: 'Negocio' },
               { key: 'cajero',  label: 'Cajero'  },
             ].map(({ key, label }) => (
               <button
                 key={key}
+                role="tab"
+                aria-selected={tab === key}
                 onClick={() => setTab(key)}
                 className={[
                   'flex-1 py-3.5 text-[13px] font-semibold transition-colors border-b-2 -mb-px',
                   tab === key
                     ? 'text-primary border-primary'
-                    : 'text-white/35 border-transparent hover:text-white/60',
+                    : 'text-white/55 border-transparent hover:text-white/80',
                 ].join(' ')}
               >
                 {label}
@@ -206,7 +188,7 @@ export default function LoginPage() {
                   </button>
                 </form>
 
-                <p className="text-center text-[#f4f1ea]/40 text-sm mt-6">
+                <p className="text-center text-[#f4f1ea]/60 text-sm mt-6">
                   ¿No tienes cuenta?{' '}
                   <Link to="/register" className="text-primary hover:text-primary/80 transition-colors">
                     Regístrate

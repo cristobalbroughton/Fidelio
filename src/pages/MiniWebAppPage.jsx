@@ -4,8 +4,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { Loader2, Star, CheckCircle2, Lock, ArrowLeft, Share2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
-import { getEffectivePlan, getPlanLimits } from '../lib/planLimits'
-import { normalizePhone } from '../lib/utils'
+import { normalizePhone, isValidChileanMobile, accentTextColor, readableOnDark } from '../lib/utils'
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +29,8 @@ export default function MiniWebAppPage() {
   const [loading, setLoading]           = useState(false)
   const [limitReached, setLimitReached] = useState(false)
   const [nameError, setNameError]       = useState('')
+  const [phoneError, setPhoneError]     = useState('')
+  const [justRegistered, setJustRegistered] = useState(false)
   const [showAllRewards, setShowAllRewards] = useState(false)
   const [showHistory, setShowHistory]   = useState(false)
   const [history, setHistory]           = useState([])
@@ -40,23 +41,19 @@ export default function MiniWebAppPage() {
   useEffect(() => {
     const init = async () => {
       const { data: bizData, error } = await supabase
-        .from('businesses')
-        .select('id, name, slug, program_name, points_per_clp, welcome_points, primary_color, logo_url, plan, pro_expires_at')
-        .eq('slug', slug)
-        .single()
+        .rpc('get_business_public', { p_slug: slug })
       if (error || !bizData) { setView('not_found'); return }
       setBusiness(bizData)
+      document.title = `${bizData.name} — ${bizData.program_name}`
       setView('phone')
 
-      const [{ data: rData }] = await Promise.all([
-        supabase
-          .from('rewards')
-          .select('id, name, description, points_required, type')
-          .eq('business_id', bizData.id)
-          .eq('is_active', true)
-          .is('deleted_at', null)
-          .order('points_required', { ascending: true }),
-      ])
+      const { data: rData } = await supabase
+        .from('rewards')
+        .select('id, name, description, points_required, type')
+        .eq('business_id', bizData.id)
+        .eq('is_active', true)
+        .is('deleted_at', null)
+        .order('points_required', { ascending: true })
       setRewards(rData ?? [])
     }
     init()
@@ -65,16 +62,18 @@ export default function MiniWebAppPage() {
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleSearch = async () => {
-    if (!phone.trim()) return
+    if (!phone.trim() || loading) return
+    if (!isValidChileanMobile(phone)) {
+      setPhoneError('Ingresa un celular chileno válido (9 dígitos, ej: 9 1234 5678)')
+      return
+    }
+    setPhoneError('')
     const normalized = normalizePhone(phone)
     setLoading(true)
     try {
-      const { data } = await supabase
-        .from('loyalty_customers')
-        .select('id, name, phone, points_balance, visits_count')
-        .eq('phone', normalized)
-        .eq('business_id', business.id)
-        .maybeSingle()
+      const { data, error } = await supabase
+        .rpc('get_customer_by_phone', { p_business_id: business.id, p_phone: normalized })
+      if (error) throw error
       if (data) { setCustomer(data); setView('panel') }
       else { setView('registering') }
     } catch { toast.error('Error al buscar cliente') }
@@ -90,48 +89,33 @@ export default function MiniWebAppPage() {
     const normalized = normalizePhone(phone)
     setLoading(true)
     try {
-      // Check plan limits (no blocker during grace period)
-      const effective = getEffectivePlan(business)
-      if (!effective.isGrace) {
-        const limits = getPlanLimits(effective.plan)
-        if (limits.maxCustomers !== Infinity) {
-          const { count } = await supabase
-            .from('loyalty_customers')
-            .select('*', { count: 'exact', head: true })
-            .eq('business_id', business.id)
-          if (count >= limits.maxCustomers) {
-            await supabase.rpc('increment_failed_registrations', { p_business_id: business.id })
-            setLimitReached(true)
-            setLoading(false)
-            return
-          }
-        }
-      }
-
-      const { data: newCustomer, error } = await supabase
-        .from('loyalty_customers')
-        .insert({
-          business_id: business.id,
-          phone: normalized,
-          name: name.trim() || null,
-          points_balance: business.welcome_points,
-          visits_count: 1,
-          last_visit_at: new Date().toISOString(),
+      const { data, error } = await supabase
+        .rpc('register_customer', {
+          p_business_id: business.id,
+          p_phone: normalized,
+          p_name: name.trim(),
         })
-        .select()
-        .single()
       if (error) throw error
-      await supabase.from('transactions').insert({
-        business_id: business.id,
-        customer_id: newCustomer.id,
-        type: 'welcome',
-        points_delta: business.welcome_points,
-        amount_clp: 0,
-      })
-      setCustomer(newCustomer)
-      setView('panel')
+
+      if (data?.status === 'ok') {
+        setCustomer(data.customer)
+        setJustRegistered(true)
+        setTimeout(() => setJustRegistered(false), 6000)
+        setView('panel')
+      } else if (data?.status === 'limit_reached') {
+        setLimitReached(true)
+      } else if (data?.status === 'duplicate_phone') {
+        // Ya registrado (race con handleSearch): recuperar al cliente existente
+        const { data: existing } = await supabase
+          .rpc('get_customer_by_phone', { p_business_id: business.id, p_phone: normalized })
+        if (existing) { setCustomer(existing); setView('panel') }
+        else toast.error('Este teléfono ya está registrado.')
+      } else {
+        toast.error('No pudimos completar tu registro. Intenta de nuevo.')
+      }
     } catch (err) {
-      toast.error(err.message ?? 'Error al registrar')
+      console.error('[register] error:', err)
+      toast.error('No pudimos completar tu registro. Intenta de nuevo.')
     } finally {
       setLoading(false)
     }
@@ -151,12 +135,7 @@ export default function MiniWebAppPage() {
     if (!customer?.id || !business?.id) return
     if (!showHistory && !historyLoaded) {
       const { data, error } = await supabase
-        .from('transactions')
-        .select('type, points_delta, created_at, rewards(name)')
-        .eq('customer_id', customer.id)
-        .eq('business_id', business.id)
-        .order('created_at', { ascending: false })
-        .limit(5)
+        .rpc('get_customer_history', { p_customer_id: customer.id, p_limit: 5 })
       if (error) {
         console.error('[history] query error:', error)
         toast.error('Error cargando historial')
@@ -169,8 +148,11 @@ export default function MiniWebAppPage() {
   }
 
   // ── Theming dinámico ────────────────────────────────────────────────────────
+  // accent: aclarado si es muy oscuro para que sea legible sobre #0f0f0f
+  // accentText: color de texto legible sobre botones con fondo accent
 
-  const accent = business?.primary_color || '#c9a84c'
+  const accent = readableOnDark(business?.primary_color || '#c9a84c')
+  const accentText = accentTextColor(accent)
 
   // ── Derivados (panel) ────────────────────────────────────────────────────────
 
@@ -218,7 +200,13 @@ export default function MiniWebAppPage() {
       className="min-h-screen bg-[#0f0f0f] flex flex-col"
       style={{ '--accent': accent }}
     >
-      <div className="max-w-sm mx-auto w-full flex flex-col min-h-screen px-6 pb-10">
+      <div
+        className="max-w-sm mx-auto w-full flex flex-col min-h-screen px-6"
+        style={{
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom, 0px))',
+        }}
+      >
 
         {/* ── Pantalla: phone ── */}
         {view === 'phone' && (
@@ -228,7 +216,10 @@ export default function MiniWebAppPage() {
               {business.logo_url && business.plan !== 'free' && (
                 <img
                   src={business.logo_url}
-                  alt={business.name}
+                  alt={`Logo de ${business.name}`}
+                  width={64}
+                  height={64}
+                  loading="lazy"
                   className="w-16 h-16 rounded-full object-cover mx-auto mb-4 border-2"
                   style={{ borderColor: `${accent}40` }}
                 />
@@ -251,34 +242,48 @@ export default function MiniWebAppPage() {
               </p>
 
               <div className="space-y-3">
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                  placeholder="+56 9 1234 5678"
-                  className={INPUT_DARK}
-                  autoFocus
-                />
+                <div>
+                  <label htmlFor="mw-phone" className="sr-only">Número de celular</label>
+                  <input
+                    id="mw-phone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    maxLength={16}
+                    value={phone}
+                    onChange={e => { setPhone(e.target.value); if (phoneError) setPhoneError('') }}
+                    onKeyDown={e => e.key === 'Enter' && !loading && handleSearch()}
+                    placeholder="+56 9 1234 5678"
+                    className={INPUT_DARK}
+                    aria-invalid={!!phoneError}
+                    aria-describedby={phoneError ? 'mw-phone-error' : undefined}
+                    autoFocus
+                  />
+                  {phoneError && (
+                    <p id="mw-phone-error" role="alert" className="text-red-400 text-[12px] mt-1.5">
+                      {phoneError}
+                    </p>
+                  )}
+                </div>
                 <button
                   onClick={handleSearch}
                   disabled={loading || !phone.trim()}
                   className="w-full font-semibold py-3.5 rounded-xl transition-opacity disabled:opacity-40 flex items-center justify-center gap-2 text-[15px]"
-                  style={{ background: accent, color: '#0f0f0f' }}
+                  style={{ background: accent, color: accentText }}
                 >
-                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
                   {loading ? 'Buscando…' : 'Continuar'}
                 </button>
               </div>
             </div>
 
-            <p className="text-center text-white/20 text-xs pb-4 pt-8 flex items-center justify-center gap-3 flex-wrap">
+            <p className="text-center text-white/45 text-xs pb-4 pt-8 flex items-center justify-center gap-4 flex-wrap">
               {business.plan === 'free' && (
-                <a href="/" className="hover:text-white/35 transition-colors">
+                <a href="/" className="hover:text-white/70 transition-colors inline-flex items-center min-h-[44px]">
                   Powered by Loyia
                 </a>
               )}
-              <a href="/privacidad" className="hover:text-white/35 transition-colors">
+              <a href="/privacidad" className="hover:text-white/70 transition-colors inline-flex items-center min-h-[44px]">
                 Privacidad
               </a>
             </p>
@@ -291,7 +296,7 @@ export default function MiniWebAppPage() {
             <div className="pt-10 pb-6">
               <button
                 onClick={() => setView('phone')}
-                className="flex items-center gap-1.5 text-white/40 hover:text-white/70 text-sm transition-colors mb-8"
+                className="flex items-center gap-1.5 text-white/55 hover:text-white/80 text-sm transition-colors mb-6 py-2.5 min-h-[44px]"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Cambiar número
@@ -330,28 +335,33 @@ export default function MiniWebAppPage() {
               ) : (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-white/40 text-[12px] font-medium mb-1.5 uppercase tracking-wider">
+                    <label htmlFor="mw-name" className="block text-white/50 text-[12px] font-medium mb-1.5 uppercase tracking-wider">
                       Tu nombre
-                    </p>
+                    </label>
                     <input
+                      id="mw-name"
                       type="text"
+                      autoComplete="name"
+                      autoCapitalize="words"
                       value={name}
                       onChange={e => { setName(e.target.value); if (nameError) setNameError('') }}
                       placeholder="Tu nombre"
                       className={INPUT_DARK}
+                      aria-invalid={!!nameError}
+                      aria-describedby={nameError ? 'mw-name-error' : undefined}
                       autoFocus
                     />
                     {nameError && (
-                      <p className="text-red-400 text-[12px] mt-1.5">{nameError}</p>
+                      <p id="mw-name-error" role="alert" className="text-red-400 text-[12px] mt-1.5">{nameError}</p>
                     )}
                   </div>
                   <button
                     onClick={handleRegister}
                     disabled={loading}
                     className="w-full font-semibold py-3.5 rounded-xl transition-opacity disabled:opacity-40 flex items-center justify-center gap-2 text-[15px]"
-                    style={{ background: accent, color: '#0f0f0f' }}
+                    style={{ background: accent, color: accentText }}
                   >
-                    {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
                     {loading ? 'Registrando…' : 'Unirse al programa'}
                   </button>
                 </div>
@@ -369,7 +379,10 @@ export default function MiniWebAppPage() {
                 {business.logo_url && business.plan !== 'free' && (
                   <img
                     src={business.logo_url}
-                    alt={business.name}
+                    alt={`Logo de ${business.name}`}
+                    width={40}
+                    height={40}
+                    loading="lazy"
                     className="w-10 h-10 rounded-full object-cover shrink-0 border"
                     style={{ borderColor: `${accent}30` }}
                   />
@@ -380,7 +393,7 @@ export default function MiniWebAppPage() {
                   </p>
                   <p className="text-white/30 text-[11px] mb-0.5 truncate">{business.name}</p>
                   <p className="text-white text-lg font-semibold">
-                    {customer.name ? `Hola, ${customer.name}` : 'Hola!'} 👋
+                    {customer.name ? `Hola, ${customer.name}` : 'Hola!'} <span aria-hidden>👋</span>
                   </p>
                 </div>
               </div>
@@ -391,6 +404,20 @@ export default function MiniWebAppPage() {
                 {customer.visits_count} visita{customer.visits_count !== 1 ? 's' : ''}
               </div>
             </div>
+
+            {/* Banner de bienvenida tras registro */}
+            {justRegistered && (
+              <div
+                role="status"
+                className="mb-4 rounded-xl px-4 py-3 border flex items-center gap-2.5"
+                style={{ background: `${accent}15`, borderColor: `${accent}35` }}
+              >
+                <Star className="w-4 h-4 fill-current shrink-0" style={{ color: accent }} aria-hidden />
+                <p className="text-white/85 text-[13px] font-medium">
+                  ¡Bienvenido! Ganaste {business.welcome_points.toLocaleString('es-CL')} puntos por unirte
+                </p>
+              </div>
+            )}
 
             {/* Tarjeta de puntos */}
             <div className="bg-white/[0.06] border border-white/[0.08] rounded-2xl p-6 mb-5">
@@ -421,7 +448,14 @@ export default function MiniWebAppPage() {
                       {nextReward.name} · {nextReward.points_required.toLocaleString('es-CL')} pts
                     </span>
                   </div>
-                  <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className="h-1.5 bg-white/10 rounded-full overflow-hidden"
+                    role="progressbar"
+                    aria-valuenow={Math.round(progress)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Progreso hacia ${nextReward.name}`}
+                  >
                     <div
                       className="h-full rounded-full transition-all duration-700"
                       style={{ width: `${progress}%`, background: accent }}
@@ -442,9 +476,19 @@ export default function MiniWebAppPage() {
             </div>
 
             {/* Recompensas */}
+            {rewards.length === 0 && (
+              <div className="mb-5 bg-white/[0.04] border border-white/[0.06] rounded-2xl px-5 py-6 text-center">
+                <Star className="w-5 h-5 mx-auto mb-2" style={{ color: accent }} aria-hidden />
+                <p className="text-white/60 text-[13px] leading-relaxed">
+                  {business.name} está preparando sus premios.
+                  <br />
+                  Sigue acumulando puntos: pronto podrás canjearlos.
+                </p>
+              </div>
+            )}
             {rewards.length > 0 && (
               <div className="mb-5">
-                <p className="text-white/40 text-[11px] font-medium uppercase tracking-wider mb-3">
+                <p className="text-white/50 text-[11px] font-medium uppercase tracking-wider mb-3">
                   Recompensas
                 </p>
                 <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl overflow-hidden divide-y divide-white/[0.05]">
@@ -488,7 +532,7 @@ export default function MiniWebAppPage() {
                 {rewards.length > 3 && (
                   <button
                     onClick={() => setShowAllRewards(v => !v)}
-                    className="mt-2 w-full text-center text-[12px] text-white/35 hover:text-white/55 transition-colors py-1"
+                    className="mt-1 w-full text-center text-[13px] text-white/55 hover:text-white/80 transition-colors py-2.5 min-h-[44px]"
                   >
                     {showAllRewards
                       ? 'Ver menos'
@@ -502,7 +546,7 @@ export default function MiniWebAppPage() {
             <div className="mb-5">
               <button
                 onClick={handleToggleHistory}
-                className="flex items-center gap-1 text-white/35 hover:text-white/55 text-[12px] font-medium transition-colors mb-3"
+                className="flex items-center gap-1 text-white/55 hover:text-white/80 text-[13px] font-medium transition-colors mb-2 py-2.5 min-h-[44px]"
               >
                 {showHistory ? 'Ver menos' : 'Ver actividad reciente →'}
               </button>
@@ -517,8 +561,8 @@ export default function MiniWebAppPage() {
                         <div key={i} className="flex items-start justify-between gap-3 px-4 py-3.5">
                           <div className="min-w-0">
                             <p className="text-white/50 text-[12px]">{formatDateLong(tx.created_at)}</p>
-                            {isRedeem && tx.rewards?.name && (
-                              <p className="text-white/30 text-[11px] mt-0.5 truncate">{tx.rewards.name}</p>
+                            {isRedeem && tx.reward_name && (
+                              <p className="text-white/30 text-[11px] mt-0.5 truncate">{tx.reward_name}</p>
                             )}
                           </div>
                           <span
@@ -539,7 +583,7 @@ export default function MiniWebAppPage() {
 
             {/* QR personal */}
             <div className="mb-5">
-              <p className="text-white/40 text-[11px] font-medium uppercase tracking-wider mb-3">
+              <p className="text-white/50 text-[11px] font-medium uppercase tracking-wider mb-3">
                 Tu código QR
               </p>
               <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl p-6 flex flex-col items-center">
@@ -575,21 +619,21 @@ export default function MiniWebAppPage() {
               </div>
               <button
                 onClick={handleShare}
-                className="flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-2.5 rounded-xl shrink-0 transition-opacity active:opacity-70"
-                style={{ background: accent, color: '#0f0f0f' }}
+                className="flex items-center gap-1.5 text-[13px] font-semibold px-3.5 py-3 min-h-[44px] rounded-xl shrink-0 transition-opacity active:opacity-70"
+                style={{ background: accent, color: accentText }}
               >
-                <Share2 className="w-3.5 h-3.5" />
+                <Share2 className="w-3.5 h-3.5" aria-hidden />
                 Compartir
               </button>
             </div>
 
-            <p className="text-center text-white/15 text-xs pb-4 pt-2 flex items-center justify-center gap-3 flex-wrap">
+            <p className="text-center text-white/45 text-xs pb-4 pt-2 flex items-center justify-center gap-4 flex-wrap">
               {business.plan === 'free' && (
-                <a href="/" className="hover:text-white/25 transition-colors">
+                <a href="/" className="hover:text-white/70 transition-colors inline-flex items-center min-h-[44px]">
                   Powered by Loyia
                 </a>
               )}
-              <a href="/privacidad" className="hover:text-white/25 transition-colors">
+              <a href="/privacidad" className="hover:text-white/70 transition-colors inline-flex items-center min-h-[44px]">
                 Privacidad
               </a>
             </p>

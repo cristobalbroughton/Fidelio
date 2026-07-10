@@ -4,11 +4,11 @@ import { Loader2, CheckCircle2 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { getEffectivePlan } from '../../lib/planLimits'
 import { useBusinessContext } from '../../contexts/BusinessContext'
 import { fmtCLP } from '../../lib/utils'
+import ErrorState from '../../components/ErrorState'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -22,7 +22,16 @@ const TOOLTIP = {
   contentStyle: { background: '#1a1a1a', color: '#f4f1ea', border: 'none', borderRadius: 8, fontSize: 11 },
   cursor: { fill: 'rgba(201,168,76,0.06)' },
 }
-const AXIS_STYLE = { fontSize: 11, fill: '#0f0f0f', opacity: 0.35 }
+const AXIS_STYLE = { fontSize: 11, fill: '#0f0f0f', opacity: 0.55 }
+
+// Empty state para charts sin datos en el período
+function ChartEmpty({ message }) {
+  return (
+    <div className="h-[200px] flex items-center justify-center">
+      <p className="text-dark/45 text-sm text-center px-4">{message}</p>
+    </div>
+  )
+}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -32,7 +41,7 @@ function SectionCard({ title, subtitle, action, children }) {
       <div className="flex items-start justify-between mb-5">
         <div>
           <h3 className="text-[14px] font-semibold text-dark">{title}</h3>
-          {subtitle && <p className="text-[12px] text-dark/40 mt-0.5">{subtitle}</p>}
+          {subtitle && <p className="text-[12px] text-dark/55 mt-0.5">{subtitle}</p>}
         </div>
         {action}
       </div>
@@ -66,12 +75,12 @@ function KPICard({ label, curr, prev, fmt, type = 'count' }) {
     }
     badge = <span className={`text-[11px] font-medium ${color}`}>{text}</span>
   } else {
-    badge = <span className="text-[11px] text-dark/30">Sin cambios vs periodo anterior</span>
+    badge = <span className="text-[11px] text-dark/50">Sin cambios vs periodo anterior</span>
   }
 
   return (
     <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm p-5">
-      <p className="text-[11px] font-medium text-dark/35 uppercase tracking-[0.08em] mb-3">{label}</p>
+      <p className="text-[11px] font-medium text-dark/55 uppercase tracking-[0.08em] mb-3">{label}</p>
       <p className="text-[30px] font-semibold text-dark leading-none tabular-nums mb-2">{fmt(curr)}</p>
       {badge}
     </div>
@@ -80,8 +89,9 @@ function KPICard({ label, curr, prev, fmt, type = 'count' }) {
 
 function SkeletonCard({ h = 'h-32' }) {
   return (
-    <div className={`bg-white rounded-2xl border border-black/[0.05] shadow-sm p-6 ${h} flex items-center justify-center`}>
-      <Loader2 className="w-5 h-5 text-primary animate-spin opacity-40" />
+    <div className={`bg-white rounded-2xl border border-black/[0.05] shadow-sm p-6 ${h}`}>
+      <div className="h-3.5 w-32 bg-dark/[0.06] rounded animate-pulse mb-4" />
+      <div className="h-full max-h-[70%] bg-dark/[0.04] rounded-xl animate-pulse" />
     </div>
   )
 }
@@ -115,9 +125,13 @@ export default function AnalyticsPage() {
 
   const [staticData, setStaticData]   = useState(null)
   const [loadingStatic, setLS]        = useState(false)
+  const [errorStatic, setES]          = useState(false)
+  const [staticKey, setStaticKey]     = useState(0)
 
   const [periodData, setPeriodData]   = useState(null)
   const [loadingPeriod, setLP]        = useState(false)
+  const [errorPeriod, setEP]          = useState(false)
+  const [periodKey, setPeriodKey]     = useState(0)
 
   const [period, setPeriod]           = useState(30)
   const [topTab, setTopTab]           = useState('points')
@@ -135,6 +149,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (!business?.id) return
     setLS(true)
+    setES(false)
 
     const now       = new Date()
     const thirtyAgo = new Date(now - 30 * 86400000)
@@ -239,14 +254,15 @@ export default function AnalyticsPage() {
 
       setStaticData({ monthlyData, topByPoints, topBySpend, rewardPerf, atRisk })
       setLS(false)
-    }).catch(() => { toast.error('Error cargando datos'); setLS(false) })
-  }, [business?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    }).catch(() => { setES(true); setLS(false) })
+  }, [business?.id, staticKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 3. Period queries ─────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!business?.id) return
     setLP(true)
+    setEP(false)
 
     const now         = new Date()
     const periodStart = new Date(now - period * 86400000)
@@ -311,8 +327,8 @@ export default function AnalyticsPage() {
 
       setPeriodData({ ticketCurr, ticketPrev, retCurr, retPrev, newCurr, newPrev, hourData, dowData })
       setLP(false)
-    }).catch(() => { toast.error('Error cargando métricas'); setLP(false) })
-  }, [business?.id, period]) // eslint-disable-line react-hooks/exhaustive-deps
+    }).catch(() => { setEP(true); setLP(false) })
+  }, [business?.id, period, periodKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Guards ────────────────────────────────────────────────────────────────
 
@@ -325,8 +341,6 @@ export default function AnalyticsPage() {
   }
 
   if (!business) return null
-
-  const loading = loadingStatic || loadingPeriod
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -342,7 +356,7 @@ export default function AnalyticsPage() {
           <h1 className="text-[26px] font-semibold text-dark tracking-tight leading-snug">
             Analytics
           </h1>
-          <p className="text-dark/45 text-sm mt-1">Métricas avanzadas de tu programa de fidelización.</p>
+          <p className="text-dark/60 text-sm mt-1">Métricas avanzadas de tu programa de fidelización.</p>
         </div>
         <PillToggle
           value={period}
@@ -354,6 +368,24 @@ export default function AnalyticsPage() {
           ]}
         />
       </div>
+
+      {/* ── Errores de carga con reintento ─────────────────────────────── */}
+      {errorPeriod && (
+        <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm">
+          <ErrorState
+            message="No pudimos cargar las métricas del período"
+            onRetry={() => setPeriodKey(k => k + 1)}
+          />
+        </div>
+      )}
+      {errorStatic && (
+        <div className="bg-white rounded-2xl border border-black/[0.05] shadow-sm">
+          <ErrorState
+            message="No pudimos cargar los datos históricos"
+            onRetry={() => setStaticKey(k => k + 1)}
+          />
+        </div>
+      )}
 
       {/* ── Bloque 1 — KPIs ────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -403,6 +435,9 @@ export default function AnalyticsPage() {
               title="Hora punta de ventas"
               subtitle="Total de transacciones por hora en el período"
             >
+              {pd.hourData.every(d => d.value === 0) ? (
+                <ChartEmpty message="Aún no hay transacciones en este período." />
+              ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={pd.hourData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
@@ -418,12 +453,16 @@ export default function AnalyticsPage() {
                   <Bar dataKey="value" fill="#c9a84c" radius={[3, 3, 0, 0]} maxBarSize={20} />
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </SectionCard>
 
             <SectionCard
               title="Día más activo"
               subtitle="Total de transacciones por día en el período"
             >
+              {pd.dowData.every(d => d.value === 0) ? (
+                <ChartEmpty message="Aún no hay transacciones en este período." />
+              ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={pd.dowData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
@@ -433,6 +472,7 @@ export default function AnalyticsPage() {
                   <Bar dataKey="value" fill="#c9a84c" radius={[3, 3, 0, 0]} maxBarSize={28} />
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </SectionCard>
           </>
         ) : null}
@@ -446,6 +486,9 @@ export default function AnalyticsPage() {
           title="Nuevos clientes por mes"
           subtitle="Crecimiento de tu base de clientes (últimos 12 meses)"
         >
+          {sd.monthlyData.every(d => d.value === 0) ? (
+            <ChartEmpty message="Aún no tienes clientes registrados en los últimos 12 meses." />
+          ) : (
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={sd.monthlyData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
@@ -455,6 +498,7 @@ export default function AnalyticsPage() {
               <Bar dataKey="value" fill="#c9a84c" radius={[3, 3, 0, 0]} maxBarSize={32} />
             </BarChart>
           </ResponsiveContainer>
+          )}
         </SectionCard>
       ) : null}
 
@@ -483,7 +527,7 @@ export default function AnalyticsPage() {
               }
             >
               {(topTab === 'points' ? sd.topByPoints : sd.topBySpend).length === 0 ? (
-                <p className="text-[13px] text-dark/35 py-4">Sin datos aún</p>
+                <p className="text-[13px] text-dark/55 py-4">Sin datos aún</p>
               ) : (
                 <div className="space-y-0">
                   {(topTab === 'points' ? sd.topByPoints : sd.topBySpend).map((c, i) => (
@@ -499,7 +543,7 @@ export default function AnalyticsPage() {
                           {c.name ?? c.phone}
                         </p>
                         {c.name && (
-                          <p className="text-[11px] text-dark/35 truncate">{c.phone}</p>
+                          <p className="text-[11px] text-dark/50 truncate">{c.phone}</p>
                         )}
                       </div>
                       <span className="text-[13px] font-semibold text-dark tabular-nums shrink-0">
@@ -519,7 +563,7 @@ export default function AnalyticsPage() {
               subtitle="Top 10 recompensas por cantidad de canjes"
             >
               {sd.rewardPerf.length === 0 ? (
-                <p className="text-[13px] text-dark/35 py-4">Sin recompensas aún</p>
+                <p className="text-[13px] text-dark/55 py-4">Sin recompensas aún</p>
               ) : (
                 <>
                   <div className="space-y-0">
@@ -563,12 +607,16 @@ export default function AnalyticsPage() {
           subtitle="Con 5+ visitas que no regresaron en 30-90 días"
           action={
             sd.atRisk.length > 0 ? (
-              <div className="flex items-center gap-2 text-[12px] text-dark/45 shrink-0">
-                <span>
-                  🟡 {sd.atRisk.filter(c => c.daysAgo <= 60).length}
+              <div className="flex items-center gap-3 text-[12px] text-dark/60 shrink-0">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" aria-hidden />
+                  <span className="sr-only">Precaución:</span>
+                  {sd.atRisk.filter(c => c.daysAgo <= 60).length}
                 </span>
-                <span>
-                  🔴 {sd.atRisk.filter(c => c.daysAgo > 60).length}
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" aria-hidden />
+                  <span className="sr-only">En riesgo:</span>
+                  {sd.atRisk.filter(c => c.daysAgo > 60).length}
                 </span>
               </div>
             ) : null
@@ -588,15 +636,18 @@ export default function AnalyticsPage() {
                   key={c.id}
                   className="flex items-center gap-3 py-3 border-b border-black/[0.04] last:border-0"
                 >
-                  <span className="text-[14px] shrink-0" title={c.daysAgo <= 60 ? 'Precaución' : 'En riesgo'}>
-                    {c.daysAgo <= 60 ? '🟡' : '🔴'}
-                  </span>
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${c.daysAgo <= 60 ? 'bg-amber-400' : 'bg-red-500'}`}
+                    title={c.daysAgo <= 60 ? 'Precaución' : 'En riesgo'}
+                    role="img"
+                    aria-label={c.daysAgo <= 60 ? 'Precaución' : 'En riesgo'}
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-medium text-dark truncate">
                       {c.name ?? c.phone}
                     </p>
                     {c.name && (
-                      <p className="text-[11px] text-dark/35 truncate">{c.phone}</p>
+                      <p className="text-[11px] text-dark/50 truncate">{c.phone}</p>
                     )}
                   </div>
                   <div className="text-right shrink-0">

@@ -9,18 +9,31 @@ import { supabase } from '../lib/supabase'
 
 // ── Scroll animation hook ─────────────────────────────────────────────────────
 
+// El contenido es visible por defecto (crawlers, reduced-motion, IO no disponible);
+// solo se oculta para animar cuando sabemos que la animación puede ejecutarse.
+function canAnimate() {
+  return (
+    typeof window !== 'undefined' &&
+    'IntersectionObserver' in window &&
+    !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
 function useFadeUp() {
   const ref = useRef(null)
-  const [visible, setVisible] = useState(false)
+  const [visible, setVisible] = useState(() => !canAnimate())
   useEffect(() => {
     const el = ref.current
-    if (!el) return
+    if (!el || visible) return
     const obs = new IntersectionObserver(
       ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect() } },
-      { threshold: 0.12 }
+      { threshold: 0.05, rootMargin: '0px 0px -5% 0px' }
     )
     obs.observe(el)
-    return () => obs.disconnect()
+    // Red de seguridad: si el observer nunca dispara, mostrar igual
+    const fallback = setTimeout(() => setVisible(true), 2500)
+    return () => { obs.disconnect(); clearTimeout(fallback) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return [ref, visible]
 }
@@ -52,7 +65,7 @@ function Navbar() {
         <div className="flex items-center gap-3">
           <Link
             to="/login"
-            className="text-white/55 hover:text-white/80 text-xs sm:text-sm font-medium transition-colors px-2 sm:px-3 py-2"
+            className="text-white/60 hover:text-white/85 text-xs sm:text-sm font-medium transition-colors px-2 sm:px-3 py-2.5 inline-flex items-center min-h-[44px]"
           >
             Iniciar sesión
           </Link>
@@ -153,14 +166,14 @@ function Hero() {
               to="/register"
               className="bg-primary text-[#0f0f0f] font-semibold px-8 py-4 rounded-xl hover:bg-primary/90 transition-colors text-[15px]"
             >
-              Empieza gratis — es gratis
+              Empieza gratis — sin tarjeta
             </Link>
             <a
               href="#como-funciona"
               onClick={handleScrollToHow}
-              className="text-white/45 hover:text-white/70 transition-colors text-[15px] flex items-center gap-1"
+              className="text-white/60 hover:text-white/85 transition-colors text-[15px] flex items-center gap-1 py-2.5 min-h-[44px]"
             >
-              Ver cómo funciona →
+              Ver cómo funciona <span aria-hidden>→</span>
             </a>
           </div>
         </div>
@@ -190,12 +203,12 @@ function SocialProof() {
         {STATS.map((s) => (
           <div key={s.number} className="text-center flex flex-col gap-2">
             <p
-              className="text-primary leading-none"
-              style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 52 }}
+              className="leading-none"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 52, color: '#8a7332' }}
             >
               {s.number}
             </p>
-            <p className="text-dark/50 text-sm leading-relaxed">{s.desc}</p>
+            <p className="text-dark/60 text-sm leading-relaxed">{s.desc}</p>
           </div>
         ))}
       </div>
@@ -232,7 +245,7 @@ function HowItWorks() {
     <section id="como-funciona" className="bg-cream py-20 px-5 border-t border-black/[0.04]">
       <div className="max-w-5xl mx-auto">
         <div ref={ref} className={fadeClass(visible)}>
-          <p className="text-dark/35 text-xs font-semibold uppercase tracking-widest text-center mb-3">Cómo funciona</p>
+          <p className="text-dark/55 text-xs font-semibold uppercase tracking-widest text-center mb-3">Cómo funciona</p>
           <h2
             className="text-dark text-center text-4xl mb-14"
             style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
@@ -256,7 +269,7 @@ function HowItWorks() {
                     </div>
                   </div>
                   <h3 className="text-dark font-semibold text-[17px]">{step.title}</h3>
-                  <p className="text-dark/50 text-sm leading-relaxed">{step.desc}</p>
+                  <p className="text-dark/60 text-sm leading-relaxed">{step.desc}</p>
                 </div>
               )
             })}
@@ -284,6 +297,7 @@ function TestimonialCard({ t }) {
   return (
     <div className="bg-white/[0.05] border border-white/[0.08] rounded-2xl p-8 max-w-2xl mx-auto">
       <span
+        aria-hidden
         className="block text-primary/35 leading-none mb-2 select-none"
         style={{ fontFamily: 'Georgia, serif', fontSize: 72, lineHeight: 1 }}
       >
@@ -299,7 +313,10 @@ function TestimonialCard({ t }) {
         {!imgError ? (
           <img
             src={t.logo}
-            alt={t.negocio}
+            alt={`Logo de ${t.negocio}`}
+            width={96}
+            height={48}
+            loading="lazy"
             onError={() => setImgError(true)}
             className="w-24 h-auto rounded-lg bg-white p-2 object-contain shrink-0"
           />
@@ -315,7 +332,7 @@ function TestimonialCard({ t }) {
         )}
         <div>
           <p className="text-white/75 font-semibold text-[14px]">{t.nombre}</p>
-          <p className="text-white/35 text-[12px] mt-0.5">{t.negocio} · {t.ciudad}</p>
+          <p className="text-white/55 text-[12px] mt-0.5">{t.negocio} · {t.ciudad}</p>
         </div>
       </div>
     </div>
@@ -328,12 +345,13 @@ function LiveSocialProof() {
 
   useEffect(() => {
     async function fetchCounts() {
-      const [b, c, t] = await Promise.all([
-        supabase.from('businesses').select('*', { count: 'exact', head: true }),
-        supabase.from('loyalty_customers').select('*', { count: 'exact', head: true }),
-        supabase.from('transactions').select('*', { count: 'exact', head: true }),
-      ])
-      setCounts({ businesses: b.count, customers: c.count, transactions: t.count })
+      const { data, error } = await supabase.rpc('get_platform_stats')
+      if (error || !data) return
+      setCounts({
+        businesses: data.businesses,
+        customers: data.customers,
+        transactions: data.transactions,
+      })
     }
     fetchCounts()
   }, [])
@@ -355,10 +373,10 @@ function LiveSocialProof() {
         <div ref={ref} className={fadeClass(visible)}>
 
           {/* Parte A — Métricas en vivo */}
-          <p className="text-white/25 text-xs font-semibold uppercase tracking-widest text-center mb-3">
+          <p className="text-white/55 text-xs font-semibold uppercase tracking-widest text-center mb-3">
             Loyia en números
           </p>
-          <div className="grid grid-cols-3 gap-6 sm:gap-10 mb-16">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-10 mb-16">
             {metrics.map((m) => (
               <div key={m.label} className="text-center flex flex-col gap-2">
                 <p
@@ -369,13 +387,13 @@ function LiveSocialProof() {
                     ? <span className="text-primary/30 text-4xl">—</span>
                     : m.value.toLocaleString('es-CL')}
                 </p>
-                <p className="text-white/35 text-[13px] leading-relaxed">{m.label}</p>
+                <p className="text-white/55 text-[13px] leading-relaxed">{m.label}</p>
               </div>
             ))}
           </div>
 
           {/* Parte B — Testimonio */}
-          <p className="text-white/25 text-xs font-semibold uppercase tracking-widest text-center mb-8">
+          <p className="text-white/55 text-xs font-semibold uppercase tracking-widest text-center mb-8">
             Lo que dicen nuestros clientes
           </p>
           <TestimonialCard t={TESTIMONIOS[activeIndex]} />
@@ -417,7 +435,7 @@ function ForWhom() {
     <section className="bg-cream py-20 px-5 border-t border-black/[0.04]">
       <div className="max-w-5xl mx-auto">
         <div ref={ref} className={fadeClass(visible)}>
-          <p className="text-dark/35 text-xs font-semibold uppercase tracking-widest text-center mb-3">Para quién es</p>
+          <p className="text-dark/55 text-xs font-semibold uppercase tracking-widest text-center mb-3">Para quién es</p>
           <h2
             className="text-dark text-center text-4xl mb-12"
             style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
@@ -437,7 +455,7 @@ function ForWhom() {
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <p className="text-dark font-semibold text-[15px] leading-snug">{item.name}</p>
-                    <p className="text-dark/45 text-[13px] leading-relaxed">{item.tagline}</p>
+                    <p className="text-dark/60 text-[13px] leading-relaxed">{item.tagline}</p>
                   </div>
                 </div>
               )
@@ -458,7 +476,7 @@ const PLANS = [
     period: null,
     desc: 'Para empezar sin riesgo',
     features: ['Hasta 50 clientes', '2 recompensas', 'Con logo Loyia', 'Soporte por email'],
-    cta: 'Empezar gratis',
+    cta: 'Empieza gratis',
     highlight: false,
   },
   {
@@ -467,7 +485,7 @@ const PLANS = [
     period: '/mes',
     desc: 'Para negocios en crecimiento',
     features: ['Hasta 300 clientes', 'Recompensas ilimitadas', 'Tu marca y logo', 'Soporte prioritario'],
-    cta: 'Empezar',
+    cta: 'Empieza gratis',
     highlight: true,
     badge: 'Más popular',
   },
@@ -477,7 +495,7 @@ const PLANS = [
     period: '/mes',
     desc: 'Para cadenas y multi-sucursal',
     features: ['Clientes ilimitados', 'Roles de cajero', 'Analytics avanzados', 'Exportar clientes', 'Notificaciones WhatsApp (próximamente)'],
-    cta: 'Empezar',
+    cta: 'Empieza gratis',
     highlight: false,
   },
 ]
@@ -488,14 +506,14 @@ function Pricing() {
     <section className="bg-[#e8e3d8] py-20 px-5">
       <div className="max-w-5xl mx-auto">
         <div ref={ref} className={fadeClass(visible)}>
-          <p className="text-dark/35 text-xs font-semibold uppercase tracking-widest text-center mb-3">Precios</p>
+          <p className="text-dark/55 text-xs font-semibold uppercase tracking-widest text-center mb-3">Precios</p>
           <h2
             className="text-dark text-center text-4xl mb-3"
             style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
           >
             Precios simples, sin sorpresas
           </h2>
-          <p className="text-dark/45 text-center text-sm mb-12">Sin tarjeta de crédito para empezar.</p>
+          <p className="text-dark/60 text-center text-sm mb-12">Sin tarjeta de crédito para empezar.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {PLANS.map((plan) => (
@@ -577,7 +595,7 @@ function FinalCTA() {
           to="/register"
           className="bg-primary text-[#0f0f0f] font-semibold px-10 py-4 rounded-xl hover:bg-primary/90 transition-colors text-[16px] mt-2"
         >
-          Crear mi programa ahora →
+          Crear mi programa ahora <span aria-hidden>→</span>
         </Link>
       </div>
     </section>
@@ -604,22 +622,22 @@ function Footer() {
         </div>
 
         {/* Links */}
-        <div className="flex items-center gap-5">
-          <Link to="/login" className="text-white/35 hover:text-white/60 text-sm transition-colors">
+        <div className="flex items-center justify-center gap-x-5 gap-y-1 flex-wrap">
+          <Link to="/login" className="text-white/55 hover:text-white/80 text-sm transition-colors inline-flex items-center min-h-[44px]">
             Iniciar sesión
           </Link>
-          <Link to="/register" className="text-white/35 hover:text-white/60 text-sm transition-colors">
+          <Link to="/register" className="text-white/55 hover:text-white/80 text-sm transition-colors inline-flex items-center min-h-[44px]">
             Registrarse
           </Link>
-          <Link to="/terminos" className="text-white/35 hover:text-white/60 text-sm transition-colors">
+          <Link to="/terminos" className="text-white/55 hover:text-white/80 text-sm transition-colors inline-flex items-center min-h-[44px]">
             Términos de uso
           </Link>
-          <Link to="/privacidad" className="text-white/35 hover:text-white/60 text-sm transition-colors">
+          <Link to="/privacidad" className="text-white/55 hover:text-white/80 text-sm transition-colors inline-flex items-center min-h-[44px]">
             Política de privacidad
           </Link>
         </div>
 
-        <p className="text-white/20 text-xs">© 2026 Loyia · Chile</p>
+        <p className="text-white/45 text-xs">© 2026 Loyia · Chile</p>
       </div>
     </footer>
   )
@@ -631,13 +649,15 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen">
       <Navbar />
-      <Hero />
-      <SocialProof />
-      <HowItWorks />
-      <LiveSocialProof />
-      <ForWhom />
-      <Pricing />
-      <FinalCTA />
+      <main>
+        <Hero />
+        <SocialProof />
+        <HowItWorks />
+        <LiveSocialProof />
+        <ForWhom />
+        <Pricing />
+        <FinalCTA />
+      </main>
       <Footer />
     </div>
   )

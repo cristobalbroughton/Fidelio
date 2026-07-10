@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { INPUT_CLASS, LABEL_CLASS } from '../../lib/utils'
 import { useBusinessContext } from '../../contexts/BusinessContext'
+import { useModalA11y } from '../../lib/useModalA11y'
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,16 @@ export default function ConfiguracionPage() {
   // Sección QR
   const [copied, setCopied]           = useState(false)
   const qrDownloadRef                 = useRef(null)
+
+  // Modal agregar cajero: Escape cierra (protegido durante guardado)
+  const closeAddModal = () => { if (!savingMember) setShowAddModal(false) }
+  useModalA11y(showAddModal, closeAddModal)
+
+  // Revoca la URL temporal del preview de logo al desmontar / cambiar
+  const logoObjectUrlRef = useRef(null)
+  useEffect(() => () => {
+    if (logoObjectUrlRef.current) URL.revokeObjectURL(logoObjectUrlRef.current)
+  }, [])
 
   // ── Inicializar formularios cuando business carga ─────────────────────────
 
@@ -273,7 +284,7 @@ export default function ConfiguracionPage() {
         >
           Configuración
         </h1>
-        <p className="text-dark/45 text-sm mt-1">
+        <p className="text-dark/60 text-sm mt-1">
           Gestiona los datos de tu negocio y programa de puntos.
         </p>
       </div>
@@ -288,7 +299,7 @@ export default function ConfiguracionPage() {
 
         <div>
           <h2 className="text-[15px] font-semibold text-dark">Tu negocio</h2>
-          <p className="text-[13px] text-dark/40 mt-0.5">Información pública visible en tu mini-webapp.</p>
+          <p className="text-[13px] text-dark/55 mt-0.5">Información pública visible en tu mini-webapp.</p>
         </div>
 
         <div className="h-px bg-black/[0.05]" />
@@ -346,8 +357,19 @@ export default function ConfiguracionPage() {
                       onChange={e => {
                         const file = e.target.files?.[0]
                         if (!file) return
+                        if (!file.type.startsWith('image/')) {
+                          toast.error('El archivo debe ser una imagen (PNG, JPG o WebP)')
+                          return
+                        }
+                        if (file.size > 2 * 1024 * 1024) {
+                          toast.error('La imagen supera los 2 MB. Usa una más liviana.')
+                          return
+                        }
+                        if (logoObjectUrlRef.current) URL.revokeObjectURL(logoObjectUrlRef.current)
+                        const url = URL.createObjectURL(file)
+                        logoObjectUrlRef.current = url
                         setLogoFile(file)
-                        setLogoPreview(URL.createObjectURL(file))
+                        setLogoPreview(url)
                       }}
                     />
                   </label>
@@ -424,7 +446,7 @@ export default function ConfiguracionPage() {
 
           <div>
             <h2 className="text-[15px] font-semibold text-dark">QR de tu negocio</h2>
-            <p className="text-[13px] text-dark/40 mt-0.5">
+            <p className="text-[13px] text-dark/55 mt-0.5">
               Descarga e imprime para que tus clientes escaneen y accedan a tu programa.
             </p>
           </div>
@@ -500,7 +522,7 @@ export default function ConfiguracionPage() {
 
         <div>
           <h2 className="text-[15px] font-semibold text-dark">Programa de puntos</h2>
-          <p className="text-[13px] text-dark/40 mt-0.5">Configura cómo se acumulan y premian los puntos.</p>
+          <p className="text-[13px] text-dark/55 mt-0.5">Configura cómo se acumulan y premian los puntos.</p>
         </div>
 
         <div className="h-px bg-black/[0.05]" />
@@ -593,7 +615,7 @@ export default function ConfiguracionPage() {
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-[15px] font-semibold text-dark">Equipo</h2>
-              <p className="text-[13px] text-dark/40 mt-0.5">Gestiona los cajeros de tu negocio.</p>
+              <p className="text-[13px] text-dark/55 mt-0.5">Gestiona los cajeros de tu negocio.</p>
             </div>
             <button
               onClick={() => { setNewName(''); setNewPin(''); setPinError(''); setShowPin(false); setShowAddModal(true) }}
@@ -613,7 +635,7 @@ export default function ConfiguracionPage() {
           )}
 
           {!loadingMembers && members.length === 0 && (
-            <p className="text-[13px] text-dark/35 py-2">
+            <p className="text-[13px] text-dark/55 py-2">
               No hay cajeros aún. Agrega uno para que puedan registrar compras.
             </p>
           )}
@@ -635,10 +657,13 @@ export default function ConfiguracionPage() {
                   </div>
                   <button
                     onClick={() => handleToggleMember(m.id, !m.is_active)}
+                    role="switch"
+                    aria-checked={m.is_active}
+                    aria-label={`${m.name}: ${m.is_active ? 'activo' : 'inactivo'}`}
                     title={m.is_active ? 'Desactivar' : 'Activar'}
                     className={[
                       'relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 flex-none',
-                      m.is_active ? 'bg-primary' : 'bg-dark/15',
+                      m.is_active ? 'bg-primary' : 'bg-dark/25',
                     ].join(' ')}
                   >
                     <span className={[
@@ -663,25 +688,32 @@ export default function ConfiguracionPage() {
         <>
           <div
             className="fixed inset-0 bg-black/40 z-40"
-            onClick={() => !savingMember && setShowAddModal(false)}
+            onClick={closeAddModal}
           />
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Agregar cajero"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4"
+            >
 
               <div className="flex items-center justify-between">
                 <h3 className="text-[16px] font-semibold text-dark">Agregar cajero</h3>
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={closeAddModal}
                   disabled={savingMember}
-                  className="text-dark/35 hover:text-dark transition-colors"
+                  aria-label="Cerrar"
+                  className="text-dark/45 hover:text-dark transition-colors flex items-center justify-center w-11 h-11 -mr-2 disabled:opacity-40"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5" aria-hidden />
                 </button>
               </div>
 
               <div>
-                <label className={LABEL_CLASS}>Nombre <span className="text-red-400">*</span></label>
+                <label htmlFor="cajero-name" className={LABEL_CLASS}>Nombre <span className="text-red-500">*</span></label>
                 <input
+                  id="cajero-name"
                   type="text"
                   value={newName}
                   onChange={e => setNewName(e.target.value)}
@@ -692,9 +724,10 @@ export default function ConfiguracionPage() {
               </div>
 
               <div>
-                <label className={LABEL_CLASS}>PIN de 6 dígitos <span className="text-red-400">*</span></label>
+                <label htmlFor="cajero-pin" className={LABEL_CLASS}>PIN de 6 dígitos <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <input
+                    id="cajero-pin"
                     type={showPin ? 'text' : 'password'}
                     value={newPin}
                     onChange={e => {
@@ -705,20 +738,23 @@ export default function ConfiguracionPage() {
                     maxLength={6}
                     placeholder="••••••"
                     className={INPUT_CLASS + ' pr-11 tracking-[0.4em]'}
+                    aria-invalid={!!pinError}
+                    aria-describedby={pinError ? 'cajero-pin-error' : undefined}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPin(p => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-dark/35 hover:text-dark transition-colors"
+                    aria-label={showPin ? 'Ocultar PIN' : 'Mostrar PIN'}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 text-dark/45 hover:text-dark transition-colors flex items-center justify-center w-10 h-10"
                   >
                     {showPin
-                      ? <EyeOff className="w-4 h-4" />
-                      : <Eye className="w-4 h-4" />
+                      ? <EyeOff className="w-4 h-4" aria-hidden />
+                      : <Eye className="w-4 h-4" aria-hidden />
                     }
                   </button>
                 </div>
                 {pinError && (
-                  <p className="text-[12px] text-red-500 mt-1.5">{pinError}</p>
+                  <p id="cajero-pin-error" role="alert" className="text-[12px] text-red-600 mt-1.5">{pinError}</p>
                 )}
               </div>
 
@@ -732,9 +768,9 @@ export default function ConfiguracionPage() {
                   Crear cajero
                 </button>
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={closeAddModal}
                   disabled={savingMember}
-                  className="w-full text-center text-[13px] text-dark/35 hover:text-dark/60 transition-colors py-1"
+                  className="w-full text-center text-[13px] text-dark/55 hover:text-dark/80 transition-colors py-2.5 min-h-[44px]"
                 >
                   Cancelar
                 </button>
@@ -773,8 +809,13 @@ function ColorPicker({ value, onChange }) {
         setOpen(false)
       }
     }
+    const handleKey = (e) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKey)
+    }
   }, [open])
 
   const handleHexChange = (val) => {
@@ -794,6 +835,8 @@ function ColorPicker({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
+        aria-label="Cambiar color principal"
+        aria-expanded={open}
         className="w-10 h-10 rounded-xl border-2 border-white shadow-md ring-1 ring-black/[0.08] transition-transform hover:scale-105 shrink-0"
         style={{ background: value }}
         title="Cambiar color"

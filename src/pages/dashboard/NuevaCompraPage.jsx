@@ -6,10 +6,11 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { getCashierSession, clearCashierSession, isCashierSession } from '../../lib/cashierSession'
 import {
-  PLAN_LIMITS, WA_UPGRADE_LINK,
-  getEffectivePlan, getPlanLimits, getUpgradeMessage,
+  WA_UPGRADE_LINK,
+  getEffectivePlan, getUpgradeMessage,
 } from '../../lib/planLimits'
-import { normalizePhone, INPUT_CLASS, LABEL_CLASS } from '../../lib/utils'
+import { normalizePhone, isValidChileanMobile, INPUT_CLASS, LABEL_CLASS } from '../../lib/utils'
+import { useModalA11y } from '../../lib/useModalA11y'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ export default function NuevaCompraPage() {
 
   // Search
   const [phone, setPhone] = useState('')
+  const [phoneError, setPhoneError] = useState('')
 
   // New customer
   const [customerName, setCustomerName] = useState('')
@@ -76,6 +78,9 @@ export default function NuevaCompraPage() {
   // Note field (earn & redeem)
   const [note, setNote] = useState('')
 
+  // Modal a11y: Escape cierra el modal de canje (si no está procesando)
+  useModalA11y(!!redeemTarget, () => { if (!redeeming) setRedeemTarget(null) })
+
   // Derived
   const amountRaw = Number(amount.replace(/\./g, ''))
   const pointsPreview =
@@ -84,50 +89,56 @@ export default function NuevaCompraPage() {
   // ── Load business on mount ─────────────────────────────────────────────────
 
   useEffect(() => {
-    const loadBiz = (query) =>
-      query.single().then(({ data, error }) => {
-        if (error) toast.error('Error cargando datos del negocio')
-        else {
-          setBusiness(data)
-          supabase
-            .from('transactions')
-            .select('*', { count: 'exact', head: true })
-            .eq('business_id', data.id)
-            .eq('type', 'earn')
-            .then(({ count }) => setHasTransactions((count ?? 0) > 0))
-        }
-        setLoadingBusiness(false)
-      })
-
     const cashier = getCashierSession()
+
     if (cashier) {
-      loadBiz(supabase
-        .from('businesses')
-        .select('id, name, points_per_clp, welcome_points, plan, pro_expires_at')
-        .eq('id', cashier.business_id))
+      // Modo cajero (anon): negocio vía RPC pública. Sin count de transacciones
+      // (la UI oculta el empty state para cajeros y ese SELECT se revoca en Fase D).
+      supabase
+        .rpc('get_business_public', { p_slug: cashier.slug })
+        .then(({ data, error }) => {
+          if (error || !data) toast.error('Error cargando datos del negocio')
+          else setBusiness(data)
+          setLoadingBusiness(false)
+        })
     } else {
       if (!user?.id) return
-      loadBiz(supabase
+      supabase
         .from('businesses')
         .select('id, name, points_per_clp, welcome_points, plan, pro_expires_at')
-        .eq('owner_id', user.id))
+        .eq('owner_id', user.id)
+        .single()
+        .then(({ data, error }) => {
+          if (error) toast.error('Error cargando datos del negocio')
+          else {
+            setBusiness(data)
+            supabase
+              .from('transactions')
+              .select('*', { count: 'exact', head: true })
+              .eq('business_id', data.id)
+              .eq('type', 'earn')
+              .then(({ count }) => setHasTransactions((count ?? 0) > 0))
+          }
+          setLoadingBusiness(false)
+        })
     }
   }, [user?.id])
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleSearch = async () => {
-    if (!business || !phone.trim()) return
+    if (!business || !phone.trim() || loading) return
+    if (!isValidChileanMobile(phone)) {
+      setPhoneError('Ingresa un celular chileno válido (9 dígitos, ej: 9 1234 5678)')
+      return
+    }
+    setPhoneError('')
     setLoading(true)
     try {
       const normalizedPhone = normalizePhone(phone)
 
       const { data, error } = await supabase
-        .from('loyalty_customers')
-        .select('*')
-        .eq('phone', normalizedPhone)
-        .eq('business_id', business.id)
-        .maybeSingle()
+        .rpc('get_customer_by_phone', { p_business_id: business.id, p_phone: normalizedPhone })
 
       if (error) throw error
 
@@ -135,12 +146,7 @@ export default function NuevaCompraPage() {
         setCustomer(data)
 
         const [{ data: visits }, { data: rewardsData }] = await Promise.all([
-          supabase.from('transactions')
-            .select('created_at, points_delta, type, rewards(name)')
-            .eq('customer_id', data.id)
-            .eq('business_id', business.id)
-            .order('created_at', { ascending: false })
-            .limit(3),
+          supabase.rpc('get_customer_history', { p_customer_id: data.id, p_limit: 3 }),
           supabase.from('rewards')
             .select('id, name, points_required')
             .eq('business_id', business.id)
@@ -166,58 +172,45 @@ export default function NuevaCompraPage() {
     if (!business) return
     setLoading(true)
     try {
-      // Check plan limits
-      const effective = getEffectivePlan(business)
-      if (!effective.isGrace) {
-        const limits = getPlanLimits(effective.plan)
-        if (limits.maxCustomers !== Infinity) {
-          const { count } = await supabase
-            .from('loyalty_customers')
-            .select('*', { count: 'exact', head: true })
-            .eq('business_id', business.id)
-          if (count >= limits.maxCustomers) {
-            const upgradeMsg = getUpgradeMessage(effective.plan)
-            setLimitError(
-              `Has alcanzado el límite de ${limits.maxCustomers} clientes en tu plan ` +
-              `${PLAN_LIMITS[effective.plan].label}. ${upgradeMsg} para continuar.`
-            )
-            setLoading(false)
-            return
-          }
-        }
-      }
       setLimitError(null)
-
       const normalizedPhone = normalizePhone(phone)
 
-      const { data: newCustomer, error: custError } = await supabase
-        .from('loyalty_customers')
-        .insert({
-          business_id: business.id,
-          phone: normalizedPhone,
-          name: customerName.trim() || null,
-          points_balance: business.welcome_points,
-          visits_count: 1,
-          last_visit_at: new Date().toISOString(),
-        })
-        .select()
-        .single()
+      const { data, error } = await supabase.rpc('register_customer', {
+        p_business_id: business.id,
+        p_phone: normalizedPhone,
+        p_name: customerName.trim(),
+      })
+      if (error) throw error
 
-      if (custError) throw custError
+      if (data?.status === 'limit_reached') {
+        const upgradeMsg = getUpgradeMessage(getEffectivePlan(business).plan)
+        setLimitError(`Has alcanzado el límite de clientes de tu plan. ${upgradeMsg} para continuar.`)
+        return
+      }
+      if (data?.status === 'duplicate_phone') {
+        // Ya existe: recuperarlo y pasar a la vista de compra
+        const { data: existing } = await supabase
+          .rpc('get_customer_by_phone', { p_business_id: business.id, p_phone: normalizedPhone })
+        if (existing) {
+          setCustomer(existing)
+          const { data: rewardsData } = await supabase.from('rewards')
+            .select('id, name, points_required')
+            .eq('business_id', business.id).eq('is_active', true).is('deleted_at', null)
+            .order('points_required', { ascending: true })
+          setRewards(rewardsData ?? [])
+          setView('purchase')
+          return
+        }
+        toast.error('Este teléfono ya está registrado.')
+        return
+      }
+      if (data?.status !== 'ok') {
+        toast.error('No se pudo registrar el cliente')
+        return
+      }
 
-      const { error: txError } = await supabase
-        .from('transactions')
-        .insert({
-          business_id: business.id,
-          customer_id: newCustomer.id,
-          type: 'welcome',
-          points_delta: business.welcome_points,
-          amount_clp: 0,
-        })
-
-      if (txError) throw txError
-
-      setResult({ type: 'earn', pointsEarned: business.welcome_points, newBalance: business.welcome_points })
+      const bal = data.customer.points_balance
+      setResult({ type: 'earn', pointsEarned: bal, newBalance: bal })
       setView('success')
     } catch (err) {
       toast.error(err.message ?? 'Error al registrar cliente')
@@ -238,50 +231,26 @@ export default function NuevaCompraPage() {
 
     setLoading(true)
     try {
-      if (isCashierSession()) {
-        const cashier = getCashierSession()
-        const { data: member } = await supabase
-          .from('team_members')
-          .select('id')
-          .eq('id', cashier.cashier_id)
-          .eq('business_id', business.id)
-          .eq('is_active', true)
-          .maybeSingle()
-        if (!member) { clearCashierSession(); navigate('/login'); return }
+      const { data, error } = await supabase.rpc('process_transaction', {
+        p_customer_id:  customer.id,
+        p_type:         'earn',
+        p_amount_clp:   amountRaw,
+        p_points_delta: points,
+        p_cashier_id:   isCashierSession() ? getCashierSession().cashier_id : null,
+        p_note:         note.trim() || null,
+      })
+      if (error) throw error
+
+      if (data?.status === 'invalid_cashier') {
+        toast.error('Sesión de cajero inválida, vuelve a iniciar sesión')
+        clearCashierSession(); navigate('/login'); return
+      }
+      if (data?.status !== 'ok') {
+        toast.error('No se pudieron acreditar los puntos')
+        return
       }
 
-      const { error: txError } = await supabase
-        .from('transactions')
-        .insert({
-          business_id: business.id,
-          customer_id: customer.id,
-          type: 'earn',
-          points_delta: points,
-          amount_clp: amountRaw,
-          cashier_id: isCashierSession() ? getCashierSession().cashier_id : null,
-          note: note.trim() || null,
-        })
-
-      if (txError) throw txError
-
-      const { error: updError } = await supabase
-        .from('loyalty_customers')
-        .update({
-          points_balance: customer.points_balance + points,
-          visits_count: customer.visits_count + 1,
-          last_visit_at: new Date().toISOString(),
-          total_spent_clp: (customer.total_spent_clp ?? 0) + amountRaw,
-        })
-        .eq('id', customer.id)
-
-      if (updError) throw updError
-
-      await supabase
-        .from('businesses')
-        .update({ last_activity_at: new Date().toISOString() })
-        .eq('id', business.id)
-
-      setResult({ type: 'earn', pointsEarned: points, newBalance: customer.points_balance + points })
+      setResult({ type: 'earn', pointsEarned: points, newBalance: data.points_balance })
       setView('success')
     } catch (err) {
       toast.error(err.message ?? 'Error al acreditar puntos')
@@ -308,12 +277,7 @@ export default function NuevaCompraPage() {
     setCustomer(foundCustomer)
     try {
       const [{ data: visits }, { data: rewardsData }] = await Promise.all([
-        supabase.from('transactions')
-          .select('created_at, points_delta, type, rewards(name)')
-          .eq('customer_id', foundCustomer.id)
-          .eq('business_id', business.id)
-          .order('created_at', { ascending: false })
-          .limit(3),
+        supabase.rpc('get_customer_history', { p_customer_id: foundCustomer.id, p_limit: 3 }),
         supabase.from('rewards')
           .select('id, name, points_required')
           .eq('business_id', business.id)
@@ -333,55 +297,33 @@ export default function NuevaCompraPage() {
     if (!customer || !redeemTarget) return
     setRedeeming(true)
     try {
-      const { data: fresh, error: fetchErr } = await supabase
-        .from('loyalty_customers')
-        .select('points_balance')
-        .eq('id', customer.id)
-        .single()
-      if (fetchErr) throw fetchErr
+      const { data, error } = await supabase.rpc('process_transaction', {
+        p_customer_id:  customer.id,
+        p_type:         'redeem',
+        p_amount_clp:   0,
+        p_points_delta: -redeemTarget.points_required,
+        p_reward_id:    redeemTarget.id,
+        p_cashier_id:   isCashierSession() ? getCashierSession().cashier_id : null,
+        p_note:         note.trim() || null,
+      })
+      if (error) throw error
 
-      if (fresh.points_balance < redeemTarget.points_required) {
-        toast.error('El cliente no tiene suficientes puntos')
+      if (data?.status === 'insufficient_points') {
+        toast.error('Puntos insuficientes')
+        setRedeemTarget(null)
+        return
+      }
+      if (data?.status === 'invalid_cashier') {
+        toast.error('Sesión de cajero inválida, vuelve a iniciar sesión')
+        clearCashierSession(); navigate('/login'); return
+      }
+      if (data?.status !== 'ok') {
+        toast.error('No se pudo procesar el canje')
         setRedeemTarget(null)
         return
       }
 
-      const newBalance = fresh.points_balance - redeemTarget.points_required
-
-      if (isCashierSession()) {
-        const cashier = getCashierSession()
-        const { data: member } = await supabase
-          .from('team_members')
-          .select('id')
-          .eq('id', cashier.cashier_id)
-          .eq('business_id', business.id)
-          .eq('is_active', true)
-          .maybeSingle()
-        if (!member) { clearCashierSession(); navigate('/login'); return }
-      }
-
-      const { error: txErr } = await supabase.from('transactions').insert({
-        business_id:  business.id,
-        customer_id:  customer.id,
-        type:         'redeem',
-        points_delta: -redeemTarget.points_required,
-        amount_clp:   0,
-        reward_id:    redeemTarget.id,
-        cashier_id:   isCashierSession() ? getCashierSession().cashier_id : null,
-        note:         note.trim() || null,
-      })
-      if (txErr) throw txErr
-
-      const { error: updErr } = await supabase.from('loyalty_customers')
-        .update({ points_balance: newBalance })
-        .eq('id', customer.id)
-      if (updErr) throw updErr
-
-      await supabase.from('businesses')
-        .update({ last_activity_at: new Date().toISOString() })
-        .eq('id', business.id)
-
-      setResult({ type: 'redeem', rewardName: redeemTarget.name, pointsSpent: redeemTarget.points_required, newBalance })
+      setResult({ type: 'redeem', rewardName: redeemTarget.name, pointsSpent: redeemTarget.points_required, newBalance: data.points_balance })
       setRedeemTarget(null)
       setView('success')
     } catch (err) {
@@ -419,7 +361,7 @@ export default function NuevaCompraPage() {
         <h1 className="text-[26px] font-semibold text-dark tracking-tight leading-snug">
           Nueva Compra
         </h1>
-        <p className="text-dark/45 text-sm mt-1.5">
+        <p className="text-dark/60 text-sm mt-1.5">
           Registra una compra y acredita puntos al cliente.
         </p>
       </div>
@@ -431,16 +373,26 @@ export default function NuevaCompraPage() {
         {view === 'search' && (
           <div className="space-y-4">
             <div>
-              <label className={LABEL_CLASS}>Teléfono del cliente</label>
+              <label htmlFor="nc-phone" className={LABEL_CLASS}>Teléfono del cliente</label>
               <input
+                id="nc-phone"
                 type="tel"
+                inputMode="tel"
+                autoComplete="off"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && phone.trim() && handleSearch()}
+                onChange={(e) => { setPhone(e.target.value); if (phoneError) setPhoneError('') }}
+                onKeyDown={(e) => e.key === 'Enter' && phone.trim() && !loading && handleSearch()}
                 placeholder="+56 9 1234 5678"
                 className={INPUT_CLASS}
+                aria-invalid={!!phoneError}
+                aria-describedby={phoneError ? 'nc-phone-error' : undefined}
                 autoFocus
               />
+              {phoneError && (
+                <p id="nc-phone-error" role="alert" className="text-red-600 text-[12px] mt-1.5">
+                  {phoneError}
+                </p>
+              )}
             </div>
             <button
               onClick={handleSearch}
@@ -465,7 +417,7 @@ export default function NuevaCompraPage() {
             {!phone.trim() && hasTransactions === false && !isCashierSession() && (
               <div className="mt-4 bg-dark/[0.02] border border-black/[0.05] rounded-2xl p-5 text-center">
                 <div className="w-10 h-10 rounded-xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-3">
-                  <ShoppingBag className="w-4.5 h-4.5 text-primary" />
+                  <ShoppingBag className="w-[18px] h-[18px] text-primary" aria-hidden />
                 </div>
                 <p className="text-dark font-semibold text-[14px] mb-1">Registra la primera compra</p>
                 <p className="text-dark/45 text-[13px] leading-relaxed mb-3">
@@ -574,11 +526,11 @@ export default function NuevaCompraPage() {
 
             {/* Recent transactions */}
             <div>
-              <p className="text-[12px] font-medium text-dark/35 uppercase tracking-[0.08em] mb-2">
+              <p className="text-[12px] font-medium text-dark/55 uppercase tracking-[0.08em] mb-2">
                 Últimas transacciones
               </p>
               {recentVisits.length === 0 ? (
-                <p className="text-[13px] text-dark/35 italic">Sin transacciones previas</p>
+                <p className="text-[13px] text-dark/55 italic">Sin transacciones previas</p>
               ) : (
                 <div className="space-y-1.5">
                   {recentVisits.map((v, i) => {
@@ -587,8 +539,8 @@ export default function NuevaCompraPage() {
                       <div key={i} className="flex items-start justify-between gap-2 text-[13px]">
                         <div className="min-w-0">
                           <span className="text-dark/55">{formatDate(v.created_at)}</span>
-                          {isRedeem && v.rewards?.name && (
-                            <p className="text-[11px] text-dark/35 mt-0.5 truncate">{v.rewards.name}</p>
+                          {isRedeem && v.reward_name && (
+                            <p className="text-[11px] text-dark/35 mt-0.5 truncate">{v.reward_name}</p>
                           )}
                         </div>
                         <span className={`font-medium shrink-0 tabular-nums ${isRedeem ? 'text-red-500' : 'text-primary'}`}>
@@ -627,6 +579,11 @@ export default function NuevaCompraPage() {
                   = {pointsPreview.toLocaleString('es-CL')} {pointsPreview === 1 ? 'punto' : 'puntos'}
                 </p>
               )}
+              {amountRaw > 0 && pointsPreview < 1 && (
+                <p className="text-[12px] text-red-600 mt-2" role="alert">
+                  El monto no alcanza para generar puntos (mínimo ${business.points_per_clp.toLocaleString('es-CL')})
+                </p>
+              )}
             </div>
 
             {/* Note field */}
@@ -654,7 +611,7 @@ export default function NuevaCompraPage() {
 
             <button
               onClick={handleReset}
-              className="w-full text-center text-[13px] text-dark/35 hover:text-dark/60 transition-colors py-1"
+              className="w-full text-center text-[13px] text-dark/55 hover:text-dark/80 transition-colors py-2.5 min-h-[44px]"
             >
               Cancelar
             </button>
@@ -664,7 +621,7 @@ export default function NuevaCompraPage() {
               <>
                 <div className="h-px bg-black/[0.06]" />
                 <div>
-                  <p className="text-[12px] font-medium text-dark/35 uppercase tracking-[0.08em] mb-3">
+                  <p className="text-[12px] font-medium text-dark/55 uppercase tracking-[0.08em] mb-3">
                     Canjear recompensa
                   </p>
                   <div className="space-y-2">
@@ -773,7 +730,12 @@ export default function NuevaCompraPage() {
             onClick={() => !redeeming && setRedeemTarget(null)}
           />
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Confirmar canje de ${redeemTarget.name}`}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4"
+            >
 
               <div>
                 <p className="text-[11px] font-medium text-dark/35 uppercase tracking-wider mb-1">
@@ -818,7 +780,7 @@ export default function NuevaCompraPage() {
                 <button
                   onClick={() => setRedeemTarget(null)}
                   disabled={redeeming}
-                  className="w-full text-center text-[13px] text-dark/35 hover:text-dark/60 transition-colors py-1"
+                  className="w-full text-center text-[13px] text-dark/55 hover:text-dark/80 transition-colors py-2.5 min-h-[44px]"
                 >
                   Cancelar
                 </button>
@@ -848,6 +810,7 @@ function QrScannerModal({ business, onClose, onFound }) {
   const [fallback, setFallback] = useState(false)
   const [manualId, setManualId] = useState('')
   const [querying, setQuerying] = useState(false)
+  useModalA11y(true, onClose)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const rafRef = useRef(null)
@@ -855,11 +818,7 @@ function QrScannerModal({ business, onClose, onFound }) {
 
   const queryCustomer = async (uuid) => {
     const { data, error } = await supabase
-      .from('loyalty_customers')
-      .select('id, phone, name, points_balance, visits_count, last_visit_at, total_spent_clp')
-      .eq('id', uuid)
-      .eq('business_id', business.id)
-      .maybeSingle()
+      .rpc('get_customer_by_id', { p_customer_id: uuid, p_business_id: business.id })
 
     if (error || !data) {
       toast.error('Cliente no encontrado en este negocio')
@@ -926,14 +885,24 @@ function QrScannerModal({ business, onClose, onFound }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Escanear QR del cliente"
+        className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-xl"
+        onClick={e => e.stopPropagation()}
+      >
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/[0.06]">
           <p className="text-[14px] font-semibold text-dark">Escanear QR del cliente</p>
-          <button onClick={onClose} className="text-dark/35 hover:text-dark transition-colors">
-            <X className="w-5 h-5" />
+          <button
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="text-dark/45 hover:text-dark transition-colors flex items-center justify-center w-11 h-11 -mr-2"
+          >
+            <X className="w-5 h-5" aria-hidden />
           </button>
         </div>
 

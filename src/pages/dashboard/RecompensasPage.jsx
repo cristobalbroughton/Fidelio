@@ -8,6 +8,8 @@ import {
   getEffectivePlan, getPlanLimits, getUpgradeMessage,
 } from '../../lib/planLimits'
 import { INPUT_CLASS, LABEL_CLASS } from '../../lib/utils'
+import { useModalA11y } from '../../lib/useModalA11y'
+import ErrorState from '../../components/ErrorState'
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -31,11 +33,14 @@ export default function RecompensasPage() {
   // Lista recompensas
   const [rewards, setRewards]             = useState([])
   const [loadingList, setLoadingList]     = useState(false)
+  const [loadError, setLoadError]         = useState(false)
+  const [reloadKey, setReloadKey]         = useState(0)
 
   // Modal
   const [modal, setModal]                 = useState(null)   // null | 'create' | 'edit'
   const [editing, setEditing]             = useState(null)
   const [form, setForm]                   = useState(EMPTY_FORM)
+  const [formErrors, setFormErrors]       = useState({})
   const [saving, setSaving]               = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting]           = useState(false)
@@ -51,6 +56,7 @@ export default function RecompensasPage() {
   useEffect(() => {
     if (!business?.id) return
     setLoadingList(true)
+    setLoadError(false)
     supabase
       .from('rewards')
       .select('id, name, description, points_required, type, is_active')
@@ -58,16 +64,17 @@ export default function RecompensasPage() {
       .is('deleted_at', null)
       .order('points_required', { ascending: true })
       .then(({ data, error }) => {
-        if (error) toast.error('Error cargando recompensas')
+        if (error) setLoadError(true)
         else setRewards(data ?? [])
         setLoadingList(false)
       })
-  }, [business?.id])
+  }, [business?.id, reloadKey])
 
   // ── Handlers modal ──────────────────────────────────────────────────────────
 
   const handleNewReward = () => {
     setForm(EMPTY_FORM)
+    setFormErrors({})
     setConfirmDelete(false)
     setEditing(null)
     setModal('create')
@@ -81,20 +88,32 @@ export default function RecompensasPage() {
       type: reward.type,
       is_active: reward.is_active,
     })
+    setFormErrors({})
     setConfirmDelete(false)
     setEditing(reward)
     setModal('edit')
   }
 
-  const handleCloseModal = () => {
+  // Cierre directo (tras guardar/eliminar con éxito)
+  const closeModal = () => {
     setModal(null)
     setEditing(null)
     setConfirmDelete(false)
+    setFormErrors({})
+  }
+
+  // Cierre por backdrop / X / Escape — protegido mientras guarda o elimina
+  const handleCloseModal = () => {
+    if (saving || deleting) return
+    closeModal()
   }
 
   const handleSave = async () => {
-    if (!form.name.trim()) return toast.error('El nombre es requerido')
-    if (!form.points_required) return toast.error('Los puntos son requeridos')
+    const errors = {}
+    if (!form.name.trim()) errors.name = 'El nombre es requerido'
+    if (!form.points_required) errors.points_required = 'Los puntos son requeridos'
+    setFormErrors(errors)
+    if (Object.keys(errors).length > 0) return
 
     setSaving(true)
     try {
@@ -131,13 +150,16 @@ export default function RecompensasPage() {
         )
         toast.success('Recompensa actualizada')
       }
-      handleCloseModal()
+      closeModal()
     } catch (err) {
       toast.error(err.message ?? 'Error al guardar')
     } finally {
       setSaving(false)
     }
   }
+
+  // Modal: Escape cierra (protegido durante guardado)
+  useModalA11y(!!modal, handleCloseModal)
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -149,7 +171,7 @@ export default function RecompensasPage() {
       if (error) throw error
       setRewards(prev => prev.filter(r => r.id !== editing.id))
       toast.success('Recompensa eliminada')
-      handleCloseModal()
+      closeModal()
     } catch (err) {
       toast.error(err.message ?? 'Error al eliminar')
     } finally {
@@ -195,7 +217,7 @@ export default function RecompensasPage() {
               >
                 Recompensas
               </h1>
-              <p className="text-dark/45 text-sm mt-1">
+              <p className="text-dark/60 text-sm mt-1">
                 {rewards.length > 0
                   ? `${rewards.length} recompensa${rewards.length !== 1 ? 's' : ''} configurada${rewards.length !== 1 ? 's' : ''}`
                   : 'Configura las recompensas de tu programa'}
@@ -248,13 +270,19 @@ export default function RecompensasPage() {
           </div>
         )}
 
-        {!loadingList && rewards.length === 0 && (
+        {!loadingList && loadError && (
+          <div className="bg-white rounded-2xl border border-black/[0.05]">
+            <ErrorState message="No pudimos cargar tus recompensas" onRetry={() => setReloadKey(k => k + 1)} />
+          </div>
+        )}
+
+        {!loadingList && !loadError && rewards.length === 0 && (
           <div className="bg-white rounded-2xl border border-black/[0.05] py-14 px-6 text-center">
             <div className="w-12 h-12 rounded-2xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-4">
-              <Gift className="w-5 h-5 text-primary" />
+              <Gift className="w-5 h-5 text-primary" aria-hidden />
             </div>
             <p className="text-dark font-semibold text-[15px] mb-1.5">Crea tu primera recompensa</p>
-            <p className="text-dark/45 text-sm leading-relaxed mb-5 max-w-xs mx-auto">
+            <p className="text-dark/60 text-sm leading-relaxed mb-5 max-w-xs mx-auto">
               Define qué pueden canjear tus clientes con sus puntos — un café gratis, un descuento, lo que quieras.
             </p>
             <button
@@ -335,14 +363,22 @@ export default function RecompensasPage() {
                 </tr>
               ))}
 
-              {!loadingList && rewards.length === 0 && (
+              {!loadingList && loadError && (
+                <tr>
+                  <td colSpan={4}>
+                    <ErrorState message="No pudimos cargar tus recompensas" onRetry={() => setReloadKey(k => k + 1)} />
+                  </td>
+                </tr>
+              )}
+
+              {!loadingList && !loadError && rewards.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-5 py-14 text-center">
                     <div className="w-12 h-12 rounded-2xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-4">
-                      <Gift className="w-5 h-5 text-primary" />
+                      <Gift className="w-5 h-5 text-primary" aria-hidden />
                     </div>
                     <p className="text-dark font-semibold text-[15px] mb-1.5">Crea tu primera recompensa</p>
-                    <p className="text-dark/45 text-sm leading-relaxed mb-4 max-w-sm mx-auto">
+                    <p className="text-dark/60 text-sm leading-relaxed mb-4 max-w-sm mx-auto">
                       Define qué pueden canjear tus clientes con sus puntos — un café gratis, un descuento, lo que quieras.
                     </p>
                     <button
@@ -360,7 +396,11 @@ export default function RecompensasPage() {
                 <tr
                   key={r.id}
                   onClick={() => handleEditReward(r)}
-                  className="cursor-pointer hover:bg-black/[0.02] transition-colors border-b border-black/[0.04] last:border-0"
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Editar ${r.name}`}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleEditReward(r) } }}
+                  className="cursor-pointer hover:bg-black/[0.02] focus-visible:bg-black/[0.03] transition-colors border-b border-black/[0.04] last:border-0"
                 >
                   <td className="px-5 py-4">
                     <p className="text-[14px] font-semibold text-dark leading-tight">{r.name}</p>
@@ -403,7 +443,12 @@ export default function RecompensasPage() {
 
           {/* Panel */}
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={modal === 'create' ? 'Nueva recompensa' : 'Editar recompensa'}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+            >
 
               {/* Header */}
               <div className="flex items-center justify-between px-6 pt-6 pb-5 border-b border-black/[0.06]">
@@ -412,9 +457,11 @@ export default function RecompensasPage() {
                 </h2>
                 <button
                   onClick={handleCloseModal}
-                  className="text-dark/35 hover:text-dark transition-colors"
+                  disabled={saving || deleting}
+                  aria-label="Cerrar"
+                  className="text-dark/45 hover:text-dark transition-colors flex items-center justify-center w-11 h-11 -mr-2 disabled:opacity-40"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5" aria-hidden />
                 </button>
               </div>
 
@@ -423,15 +470,21 @@ export default function RecompensasPage() {
 
                 {/* Nombre */}
                 <div>
-                  <label className={LABEL_CLASS}>Nombre <span className="text-red-400">*</span></label>
+                  <label htmlFor="rw-name" className={LABEL_CLASS}>Nombre <span className="text-red-500">*</span></label>
                   <input
+                    id="rw-name"
                     type="text"
                     value={form.name}
-                    onChange={set('name')}
+                    onChange={e => { set('name')(e); if (formErrors.name) setFormErrors(f => ({ ...f, name: undefined })) }}
                     placeholder="ej. Café gratis"
                     className={INPUT_CLASS}
+                    aria-invalid={!!formErrors.name}
+                    aria-describedby={formErrors.name ? 'rw-name-error' : undefined}
                     autoFocus
                   />
+                  {formErrors.name && (
+                    <p id="rw-name-error" role="alert" className="text-red-600 text-[12px] mt-1.5">{formErrors.name}</p>
+                  )}
                 </div>
 
                 {/* Descripción */}
@@ -449,15 +502,21 @@ export default function RecompensasPage() {
                 {/* Puntos y Tipo en dos columnas */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className={LABEL_CLASS}>Puntos requeridos <span className="text-red-400">*</span></label>
+                    <label htmlFor="rw-points" className={LABEL_CLASS}>Puntos requeridos <span className="text-red-500">*</span></label>
                     <input
+                      id="rw-points"
                       type="text"
                       inputMode="numeric"
                       value={form.points_required}
-                      onChange={setNum('points_required')}
+                      onChange={e => { setNum('points_required')(e); if (formErrors.points_required) setFormErrors(f => ({ ...f, points_required: undefined })) }}
                       placeholder="500"
                       className={INPUT_CLASS}
+                      aria-invalid={!!formErrors.points_required}
+                      aria-describedby={formErrors.points_required ? 'rw-points-error' : undefined}
                     />
+                    {formErrors.points_required && (
+                      <p id="rw-points-error" role="alert" className="text-red-600 text-[12px] mt-1.5">{formErrors.points_required}</p>
+                    )}
                   </div>
                   <div>
                     <label className={LABEL_CLASS}>Tipo</label>
@@ -477,10 +536,13 @@ export default function RecompensasPage() {
                 <div className="flex items-center justify-between py-1">
                   <div>
                     <p className="text-[14px] font-medium text-dark">Activa</p>
-                    <p className="text-[12px] text-dark/40">Los clientes pueden ver y canjear esta recompensa</p>
+                    <p className="text-[12px] text-dark/55">Los clientes pueden ver y canjear esta recompensa</p>
                   </div>
                   <button
                     type="button"
+                    role="switch"
+                    aria-checked={form.is_active}
+                    aria-label="Recompensa activa"
                     onClick={toggle('is_active')}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
                       form.is_active ? 'bg-primary' : 'bg-dark/20'
