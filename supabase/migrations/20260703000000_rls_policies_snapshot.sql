@@ -13,6 +13,16 @@
 --
 -- ⚠️ AUDITORÍA: las policies marcadas [C3][C5][I7][C6] son los hallazgos
 -- críticos confirmados de la auditoría #2 — ver plan de fixes por lotes.
+--
+-- ⛔ OBSOLETO (2026-07-10): las policies anon aquí listadas
+--    ("anon reads customers", "anon_select_transactions", "anon inserts
+--    customers", "anon inserts transactions", "anon_select" en team_members,
+--    y las 3 de SELECT anon en businesses) FUERON REVOCADAS por la migración
+--    20260710000000_lote1_lockdown.sql (Fase D del Lote 1).
+--    El acceso anon ahora es EXCLUSIVAMENTE vía las RPCs SECURITY DEFINER de
+--    20260705000000_lote1_rpcs.sql. La única lectura directa anon que subsiste
+--    es rewards ("anon reads active rewards", is_active = true).
+--    Este archivo se conserva como registro histórico del estado pre-lockdown.
 -- ============================================================================
 
 -- RLS habilitado en las 5 tablas:

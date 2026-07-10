@@ -29,6 +29,20 @@ Tablas principales: `businesses`, `loyalty_customers`, `rewards`, `transactions`
 - Filtros de fecha: `.gte('created_at', isoString)` / `.lte(...)` — siempre pasar `.toISOString()`
 - Row Level Security (RLS) habilitado — cada `business` solo ve sus propios datos
 
+## Seguridad — capa de datos (Lote 1, auditoría #2)
+- **Modelo:** `anon` NO tiene acceso directo a tablas salvo `SELECT` en `rewards` (`is_active = true`, no es PII). Todo lo demás pasa por **RPCs `SECURITY DEFINER`** (`supabase/migrations/20260705000000_lote1_rpcs.sql`). El lockdown que revocó el acceso anon directo está en `20260710000000_lote1_lockdown.sql`.
+- **`owner`** (autenticado) mantiene sus policies `owner_id = auth.uid()`; **admin** mantiene `auth.email() = <admin>`. Esas lecturas del dashboard siguen siendo SELECT directo.
+- Cada RPC devuelve **jsonb con campo `status`**. Manejar `status` en el frontend, no `error`:
+  - `register_customer(p_business_id, p_phone, p_name)` → `ok`+`customer` | `limit_reached` | `duplicate_phone` | `not_found`. Valida límite de plan y fija `points_balance = welcome_points` server-side; inserta cliente + welcome tx atómicos.
+  - `process_transaction(p_customer_id, p_type, p_amount_clp, p_points_delta, p_cashier_id, p_note, p_reward_id)` → `ok`+`points_balance` | `insufficient_points` | `invalid_cashier` | `forbidden` | `not_found`. Atómico (`FOR UPDATE` + guard `>= 0`); doble auth (dueño por ownership / cajero por `cashier_id` activo). **Usar el `points_balance` devuelto, NO cálculo optimista.**
+  - `verify_cashier_pin(p_business_id, p_pin)` → `ok`+`cashier` | `invalid_pin` | `disabled` | `rate_limited`+`retry_after`. Compara con pgcrypto (`search_path = public, extensions`); nunca devuelve `pin_hash`. Rate-limit server-side 5 fallos/30s por negocio (tabla `cashier_pin_attempts`).
+  - `get_platform_stats()` → `{businesses, customers, transactions}` (solo enteros; para LiveSocialProof).
+  - `get_business_public(p_slug)` → campos públicos del negocio o `null`. NO devuelve `pro_expires_at`; sí `plan`.
+  - `get_customer_by_phone(p_business_id, p_phone)` / `get_customer_by_id(p_customer_id, p_business_id)` → `{id,name,phone,points_balance,visits_count}` o `null` (forma reducida, sin `total_spent_clp`/`last_visit_at`).
+  - `get_customer_history(p_customer_id, p_limit)` → array `{type, points_delta, created_at, reward_name}` (reward_name plano, no `rewards(name)`).
+- Crear cajeros en ConfiguracionPage sigue hasheando el PIN con bcryptjs client-side (owner policy permite el INSERT en `team_members`). `verify_cashier_pin` normaliza el prefijo `$2b$`/`$2y$` → `$2a$` para compatibilidad con pgcrypto.
+- **Residual conocido:** el lookup puntual por teléfono sigue disponible a anon (inherente a la mini-webapp); el volcado masivo de PII sí quedó cerrado.
+
 ## Schema Supabase
 - `businesses`: owner_id, name, slug, category, description, program_name, points_per_clp, welcome_points, primary_color (hex), logo_url (text, nullable), plan (text), last_activity_at (timestamp)
 - `loyalty_customers`: business_id, phone, name, points_balance, visits_count, last_visit_at, joined_at (timestamp — fecha de registro del cliente; usar este campo para filtros de fecha, NO created_at)
@@ -53,7 +67,8 @@ CREATE TABLE team_members (
 );
 ALTER TABLE transactions ADD COLUMN cashier_id uuid REFERENCES team_members(id);
 ALTER TABLE transactions ADD COLUMN note text;
--- RLS team_members: anon puede SELECT (para login cajero con PIN); pin_hash bcrypt es seguro exponer
+-- (Histórico) team_members tenía SELECT anon para login con PIN; REVOCADO en el
+-- Lote 1 — el login de cajero ahora pasa por verify_cashier_pin (ver §Seguridad)
 ```
 
 ## Comandos útiles
@@ -80,7 +95,7 @@ ALTER TABLE transactions ADD COLUMN note text;
 - Auth: no llamar `navigate()` tras `signIn()`/`signUp()` — PublicRoute/ProtectedRoute redirigen reactivamente al cambiar `user`
 - Nombre del negocio en sidebar: viene de `user.user_metadata.business_name` (guardado con `supabase.auth.updateUser` en onboarding)
 - PublicRoute redirige a `/onboarding` si `user_metadata.business_name` está vacío, a `/dashboard` si está presente
-- Mini-webapp pública `/c/:slug`: no usa auth, queries anon — RLS debe permitir SELECT anon en `businesses` (by slug), `loyalty_customers` (by business_id), `rewards` (by business_id); e INSERT anon en `loyalty_customers` y `transactions`
+- Mini-webapp pública `/c/:slug`: no usa auth. Desde el Lote 1 (ver §Seguridad) NO accede directo a tablas: usa las RPCs `get_business_public`, `get_customer_by_phone`, `register_customer`, `get_customer_history`. La única lectura directa anon que subsiste es `rewards` (`is_active = true`)
 - Admin email: `cristobal.broughton@gmail.com` — guard inline en `AdminPage` con `user.email !== ADMIN_EMAIL` → redirect `/dashboard`; link "Admin" en sidebar condicional al mismo email
 - AdminPage queries sin filtro `business_id` — requiere RLS policy en Supabase: `auth.email() = 'cristobal.broughton@gmail.com'` puede SELECT all en todas las tablas
 
